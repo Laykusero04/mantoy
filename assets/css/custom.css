@@ -1,0 +1,180 @@
+/* ============================================
+   BDPT - Custom Styles
+   ============================================ */
+
+:root {
+    --sidebar-width: 250px;
+    --navbar-height: 56px;
+    --primary-color: #1a56db;
+}
+
+/* ----- Body & Layout ----- */
+body {
+    padding-top: var(--navbar-height);
+    background-color: #f4f6f9;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+/* ----- Navbar ----- */
+.navbar.bg-primary {
+    background-color: var(--primary-color) !important;
+}
+
+.navbar-brand {
+    font-size: 1.05rem;
+}
+
+/* ----- Sidebar ----- */
+#sidebar {
+    width: var(--sidebar-width);
+    min-height: calc(100vh - var(--navbar-height));
+    position: fixed;
+    top: var(--navbar-height);
+    left: 0;
+    z-index: 1000;
+    overflow-y: auto;
+    transition: transform 0.3s ease;
+}
+
+#sidebar .nav-link {
+    color: #495057;
+    padding: 0.6rem 1rem;
+    font-size: 0.9rem;
+    border-radius: 0;
+    transition: background-color 0.15s ease;
+}
+
+#sidebar .nav-link:hover {
+    background-color: #e9ecef;
+    color: #1a56db;
+}
+
+#sidebar .nav-link.active {
+    background-color: #dbeafe;
+    color: #1a56db;
+    font-weight: 600;
+    border-left: 3px solid #1a56db;
+}
+
+#sidebar .nav-link i {
+    width: 20px;
+    text-align: center;
+}
+
+#sidebar .collapse .nav-link {
+    padding-left: 1rem;
+    font-size: 0.85rem;
+}
+
+/* ----- Main Content ----- */
+#main-content {
+    margin-left: var(--sidebar-width);
+    min-height: calc(100vh - var(--navbar-height));
+}
+
+/* ----- Footer ----- */
+#main-footer {
+    margin-left: var(--sidebar-width);
+}
+
+/* ----- Dashboard Cards ----- */
+.stat-card {
+    border: none;
+    border-radius: 0.5rem;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.stat-card .card-body {
+    padding: 1.25rem;
+}
+
+.stat-card .stat-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.4rem;
+}
+
+.stat-card .stat-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.stat-card .stat-label {
+    font-size: 0.8rem;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* ----- Chart containers ----- */
+.chart-container {
+    position: relative;
+    height: 300px;
+}
+
+/* ----- Tables ----- */
+.table th {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #6b7280;
+    border-bottom-width: 2px;
+}
+
+/* ----- Status badges ----- */
+.badge-not-started { background-color: #6b7280; }
+.badge-in-progress { background-color: #0891b2; }
+.badge-on-hold { background-color: #d97706; }
+.badge-completed { background-color: #059669; }
+.badge-cancelled { background-color: #dc2626; }
+
+/* ----- Priority badges ----- */
+.badge-high { background-color: #dc2626; }
+.badge-medium { background-color: #d97706; }
+.badge-low { background-color: #059669; }
+
+/* ----- Section titles ----- */
+.section-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #374151;
+}
+
+/* ----- Responsive: Mobile ----- */
+@media (max-width: 991.98px) {
+    #sidebar {
+        transform: translateX(-100%);
+    }
+
+    #sidebar.show {
+        transform: translateX(0);
+    }
+
+    #main-content {
+        margin-left: 0;
+    }
+
+    #main-footer {
+        margin-left: 0;
+    }
+}
+
+/* ----- Scrollbar ----- */
+#sidebar::-webkit-scrollbar {
+    width: 4px;
+}
+
+#sidebar::-webkit-scrollbar-thumb {
+    background-color: #d1d5db;
+    border-radius: 4px;
+}

@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir:*)",
+      "Bash(curl:*)",
+      "Bash(c:/xampp/php/php.exe:*)",
+      "Bash(for f in \"c:/xampp/htdocs/mantoy/actions/project_actions.php\" \"c:/xampp/htdocs/mantoy/actions/category_actions.php\" \"c:/xampp/htdocs/mantoy/pages/projects/create.php\" \"c:/xampp/htdocs/mantoy/pages/projects/edit.php\" \"c:/xampp/htdocs/mantoy/pages/projects/list.php\" \"c:/xampp/htdocs/mantoy/pages/projects/view.php\" \"c:/xampp/htdocs/mantoy/pages/projects/archive.php\" \"c:/xampp/htdocs/mantoy/pages/settings/categories.php\")",
+      "Bash(do c:/xampp/php/php.exe -l \"$f\")",
+      "Bash(done)",
+      "Bash(for f in \"c:/xampp/htdocs/mantoy/pages/projects/view.php\" \"c:/xampp/htdocs/mantoy/actions/budget_actions.php\" \"c:/xampp/htdocs/mantoy/actions/milestone_actions.php\" \"c:/xampp/htdocs/mantoy/actions/action_log_actions.php\" \"c:/xampp/htdocs/mantoy/actions/attachment_actions.php\")",
+      "Bash(where:*)",
+      "Bash(c:\\\\xampp\\\\mysql\\\\bin\\\\mysql.exe:*)",
+      "Bash(c:/xampp/mysql/bin/mysql -u root bdpt_db -e \"SHOW TABLES;\")",
+      "Bash(c:/xampp/mysql/bin/mysql -u root bdpt_db -e \"DESCRIBE projects;\")",
+      "Bash(c:/xampp/mysql/bin/mysql -u root bdpt_db -e \"DESCRIBE attachments;\")",
+      "Bash(c:/xampp/mysql/bin/mysql -u root bdpt_db -e \"SELECT COUNT\\(*\\) AS table_count FROM information_schema.TABLES WHERE TABLE_SCHEMA=''bdpt_db'';\")",
+      "Bash(c:/xampp/mysql/bin/mysql -u root bdpt_db -e \"SELECT id, username, full_name, role FROM users;\")",
+      "Bash(c:/xampp/mysql/bin/mysql -u root bdpt_db -e \"SELECT COUNT\\(*\\) AS migrated_letters FROM letters; SELECT COUNT\\(*\\) AS migrated_attachments FROM attachments WHERE module_type != ''general'';\")",
+      "Bash(c:/xampp/mysql/bin/mysql -u root bdpt_db -e \"SELECT module_type, COUNT\\(*\\) as cnt FROM attachments GROUP BY module_type;\")",
+      "Bash(c:/xampp/mysql/bin/mysql -u root bdpt_db -e \"SELECT COUNT\\(*\\) as total FROM workflow_attachments;\")",
+      "Bash(c:/xampp/mysql/bin/mysql -u root bdpt_db -e \"RENAME TABLE workflow_attachments TO _old_workflow_attachments; RENAME TABLE workflow_stages TO _old_workflow_stages;\")",
+      "Bash(c:/xampp/mysql/bin/mysql -u root bdpt_db -e \"SELECT id FROM projects WHERE is_deleted=0 LIMIT 1;\")"
+    ]
+  }
+}
