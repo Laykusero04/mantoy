@@ -322,7 +322,7 @@ if ($reportType === 'status') {
     $pdf->SetTitle("Project Status Report - FY $year");
     pdfHeader($pdf, $barangay, $municipal, $province, "PROJECT STATUS REPORT - FY $year");
 
-    $statuses = ['Not Started', 'In Progress', 'On Hold', 'Completed', 'Cancelled'];
+    $statuses = STATUS_OPTIONS;
     foreach ($statuses as $status) {
         $stmt = $pdo->prepare("SELECT p.title, p.project_type, p.budget_allocated, p.start_date, p.target_end_date FROM projects p WHERE p.is_deleted = 0 AND p.is_archived = 0 AND p.fiscal_year = ? AND p.status = ? ORDER BY p.title");
         $stmt->execute([$year, $status]);

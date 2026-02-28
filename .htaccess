@@ -1,0 +1,8 @@
+# Disable directory listings
+Options -Indexes
+
+# Block direct browser access to internal PHP directories
+RedirectMatch 403 ^/mantoy/config/.*$
+RedirectMatch 403 ^/mantoy/database/.*$
+RedirectMatch 403 ^/mantoy/includes/.*$
+RedirectMatch 403 ^/mantoy/logs/.*$

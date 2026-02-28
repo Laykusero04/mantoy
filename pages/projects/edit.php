@@ -92,8 +92,9 @@ foreach ($allWfAttachments as $att) {
                     <label for="department" class="form-label">Department <span class="text-danger">*</span></label>
                     <select class="form-select" id="department" name="department">
                         <option value="">Select department...</option>
-                        <option value="CEO" <?= ($project['department'] ?? '') === 'CEO' ? 'selected' : '' ?>>CEO</option>
-                        <option value="Mayors" <?= ($project['department'] ?? '') === 'Mayors' ? 'selected' : '' ?>>Mayors</option>
+                        <?php foreach (getDepartments($pdo) as $dept): ?>
+                            <option value="<?= sanitize($dept) ?>" <?= ($project['department'] ?? '') === $dept ? 'selected' : '' ?>><?= sanitize($dept) ?></option>
+                        <?php endforeach; ?>
                     </select>
                 </div>
                 <div class="col-md-4" id="subtypeGroup" <?= empty($project['department']) ? 'style="display:none;"' : '' ?>>
@@ -101,7 +102,7 @@ foreach ($allWfAttachments as $att) {
                     <select class="form-select" id="project_subtype" name="project_subtype">
                         <option value="">Select sub-type...</option>
                         <?php
-                        $allSubtypes = getDepartmentSubtypes();
+                        $allSubtypes = getDepartmentSubtypes($pdo);
                         $currentDept = $project['department'] ?? '';
                         if ($currentDept && isset($allSubtypes[$currentDept])):
                             foreach ($allSubtypes[$currentDept] as $st): ?>
@@ -130,7 +131,7 @@ foreach ($allWfAttachments as $att) {
                 <div class="col-md-4">
                     <label for="status" class="form-label">Status</label>
                     <select class="form-select" id="status" name="status">
-                        <?php foreach (['Not Started', 'In Progress', 'On Hold', 'Completed', 'Cancelled'] as $s): ?>
+                        <?php foreach (STATUS_OPTIONS as $s): ?>
                             <option value="<?= $s ?>" <?= $project['status'] === $s ? 'selected' : '' ?>><?= $s ?></option>
                         <?php endforeach; ?>
                     </select>
@@ -288,9 +289,10 @@ foreach ($allWfAttachments as $att) {
                 </div>
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label class="form-label">File <span class="text-danger">*</span></label>
-                        <input type="file" name="file" class="form-control" required>
-                        <div class="form-text">Max 10MB. Allowed: <?= implode(', ', ALLOWED_EXTENSIONS) ?></div>
+                        <label class="form-label">Files <span class="text-danger">*</span></label>
+                        <input type="file" name="files[]" class="form-control" multiple required
+                               accept=".<?= implode(',.', ALLOWED_EXTENSIONS) ?>">
+                        <div class="form-text">Max 50MB per file. Select multiple files. Allowed: <?= strtoupper(implode(', ', ALLOWED_EXTENSIONS)) ?></div>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Description</label>
@@ -308,10 +310,7 @@ foreach ($allWfAttachments as $att) {
 
 <?php
 $pageScripts = '<script>
-const subtypes = {
-    "CEO": ["Planning and Programming", "Construction"],
-    "Mayors": ["BDP", "SEF", "Special Projects"]
-};
+const subtypes = ' . json_encode(getDepartmentSubtypes($pdo)) . ';
 
 function updateClassification() {
     const vis = document.querySelector("input[name=visibility]:checked").value;

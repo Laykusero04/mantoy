@@ -34,6 +34,8 @@ body {
     z-index: 1000;
     overflow-y: auto;
     transition: transform 0.3s ease;
+    scrollbar-width: thin;
+    scrollbar-color: #d1d5db transparent;
 }
 
 #sidebar .nav-link {
@@ -46,14 +48,14 @@ body {
 
 #sidebar .nav-link:hover {
     background-color: #e9ecef;
-    color: #1a56db;
+    color: var(--primary-color);
 }
 
 #sidebar .nav-link.active {
     background-color: #dbeafe;
-    color: #1a56db;
+    color: var(--primary-color);
     font-weight: 600;
-    border-left: 3px solid #1a56db;
+    border-left: 3px solid var(--primary-color);
 }
 
 #sidebar .nav-link i {
@@ -116,6 +118,24 @@ body {
     letter-spacing: 0.5px;
 }
 
+.stat-card-alert {
+    animation: pulse-border 2s ease-in-out infinite;
+}
+
+@keyframes pulse-border {
+    0%, 100% { box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1); }
+    50% { box-shadow: 0 2px 8px rgba(220, 38, 38, 0.2); }
+}
+
+/* ----- Dashboard List Items ----- */
+.dash-list-item {
+    transition: background-color 0.15s ease;
+}
+
+.dash-list-item:hover {
+    background-color: #f8f9fa;
+}
+
 /* ----- Chart containers ----- */
 .chart-container {
     position: relative;
@@ -150,6 +170,63 @@ body {
     color: #374151;
 }
 
+/* ----- Dashed Border Utility ----- */
+.border-dashed {
+    border-style: dashed !important;
+}
+
+/* ----- Scrollable Tabs ----- */
+.nav-tabs-scrollable {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: #d1d5db transparent;
+}
+
+.nav-tabs-scrollable .nav-link {
+    white-space: nowrap;
+}
+
+.nav-tabs-scrollable::-webkit-scrollbar {
+    height: 3px;
+}
+
+.nav-tabs-scrollable::-webkit-scrollbar-thumb {
+    background-color: #d1d5db;
+    border-radius: 3px;
+}
+
+/* ----- Loading state for buttons ----- */
+.btn-loading {
+    pointer-events: none;
+    opacity: 0.75;
+    position: relative;
+}
+
+.btn-loading .btn-text {
+    visibility: hidden;
+}
+
+.btn-loading::after {
+    content: "";
+    position: absolute;
+    width: 1rem;
+    height: 1rem;
+    top: 50%;
+    left: 50%;
+    margin-top: -0.5rem;
+    margin-left: -0.5rem;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: btn-spin 0.6s linear infinite;
+}
+
+@keyframes btn-spin {
+    to { transform: rotate(360deg); }
+}
+
 /* ----- Responsive: Mobile ----- */
 @media (max-width: 991.98px) {
     #sidebar {
@@ -169,7 +246,7 @@ body {
     }
 }
 
-/* ----- Scrollbar ----- */
+/* ----- Scrollbar (Webkit + Firefox) ----- */
 #sidebar::-webkit-scrollbar {
     width: 4px;
 }

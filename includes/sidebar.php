@@ -14,6 +14,13 @@ $isSettingsSection = strpos($currentPath, '/pages/settings/') !== false;
                 </a>
             </li>
 
+            <!-- Calendar -->
+            <li class="nav-item">
+                <a class="nav-link <?= strpos($currentPath, '/pages/calendar/') !== false ? 'active' : '' ?>" href="<?= BASE_URL ?>/pages/calendar/index.php">
+                    <i class="bi bi-calendar-event me-2"></i> Calendar
+                </a>
+            </li>
+
             <!-- Projects Section -->
             <li class="nav-item">
                 <a class="nav-link d-flex justify-content-between align-items-center <?= $isProjectsSection ? '' : 'collapsed' ?>"

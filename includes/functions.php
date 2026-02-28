@@ -2,6 +2,22 @@
 session_start();
 
 /**
+ * Log a message to logs/app.log
+ */
+function appLog($level, $message, $context = []) {
+    $logDir = dirname(__DIR__) . '/logs';
+    if (!is_dir($logDir)) {
+        mkdir($logDir, 0755, true);
+    }
+    $timestamp = date('Y-m-d H:i:s');
+    $entry = "[$timestamp] [$level] $message";
+    if ($context) {
+        $entry .= ' | ' . json_encode($context, JSON_UNESCAPED_SLASHES);
+    }
+    error_log($entry . PHP_EOL, 3, $logDir . '/app.log');
+}
+
+/**
  * Redirect to a URL
  */
 function redirect($url) {
@@ -88,13 +104,29 @@ function getClassificationBadgeClass($project) {
 }
 
 /**
- * Get department sub-types mapping
+ * Get active departments from DB.
  */
-function getDepartmentSubtypes() {
-    return [
-        'CEO' => ['Planning and Programming', 'Construction'],
-        'Mayors' => ['BDP', 'SEF', 'Special Projects'],
-    ];
+function getDepartments($pdo) {
+    $stmt = $pdo->query("SELECT name FROM departments WHERE is_active = 1 ORDER BY sort_order");
+    return $stmt->fetchAll(PDO::FETCH_COLUMN);
+}
+
+/**
+ * Get department → subtypes mapping from DB.
+ */
+function getDepartmentSubtypes($pdo) {
+    $stmt = $pdo->query("
+        SELECT d.name AS dept, ds.name AS subtype
+        FROM department_subtypes ds
+        JOIN departments d ON ds.department_id = d.id
+        WHERE ds.is_active = 1 AND d.is_active = 1
+        ORDER BY d.sort_order, ds.sort_order
+    ");
+    $map = [];
+    foreach ($stmt as $row) {
+        $map[$row['dept']][] = $row['subtype'];
+    }
+    return $map;
 }
 
 /**
@@ -109,7 +141,7 @@ function getProjectCounts($pdo, $fiscalYear) {
     $counts['total'] = $stmt->fetchColumn();
 
     // By status
-    $statuses = ['Not Started', 'In Progress', 'On Hold', 'Completed', 'Cancelled'];
+    $statuses = STATUS_OPTIONS;
     foreach ($statuses as $status) {
         $stmt = $pdo->prepare("SELECT COUNT(*) FROM projects WHERE is_deleted = 0 AND is_archived = 0 AND fiscal_year = ? AND status = ?");
         $stmt->execute([$fiscalYear, $status]);
@@ -128,7 +160,7 @@ function getProjectCounts($pdo, $fiscalYear) {
         : 0;
 
     // By department
-    $departments = ['CEO', 'Mayors'];
+    $departments = getDepartments($pdo);
     foreach ($departments as $dept) {
         $stmt = $pdo->prepare("SELECT COUNT(*) as cnt, COALESCE(SUM(budget_allocated), 0) as budget FROM projects WHERE is_deleted = 0 AND is_archived = 0 AND fiscal_year = ? AND department = ?");
         $stmt->execute([$fiscalYear, $dept]);
@@ -139,7 +171,8 @@ function getProjectCounts($pdo, $fiscalYear) {
     }
 
     // By subtype
-    $subtypes = ['Planning and Programming', 'Construction', 'BDP', 'SEF', 'Special Projects'];
+    $allSubtypes = getDepartmentSubtypes($pdo);
+    $subtypes = array_merge(...array_values($allSubtypes));
     foreach ($subtypes as $subtype) {
         $stmt = $pdo->prepare("SELECT COUNT(*) as cnt, COALESCE(SUM(budget_allocated), 0) as budget FROM projects WHERE is_deleted = 0 AND is_archived = 0 AND fiscal_year = ? AND project_subtype = ?");
         $stmt->execute([$fiscalYear, $subtype]);
@@ -221,4 +254,70 @@ function getCurrentPage() {
  */
 function getCurrentPath() {
     return $_SERVER['SCRIPT_NAME'] ?? '';
+}
+
+/**
+ * Get CSS class for a project status badge
+ */
+function statusBadgeClass($status) {
+    $map = [
+        'Not Started' => 'badge-not-started',
+        'In Progress' => 'badge-in-progress',
+        'On Hold'     => 'badge-on-hold',
+        'Completed'   => 'badge-completed',
+        'Cancelled'   => 'badge-cancelled',
+    ];
+    return $map[$status] ?? 'bg-secondary';
+}
+
+/**
+ * Get CSS class for a priority badge
+ */
+function priorityBadgeClass($priority) {
+    $map = ['High' => 'badge-high', 'Medium' => 'badge-medium', 'Low' => 'badge-low'];
+    return $map[$priority] ?? 'bg-secondary';
+}
+
+/**
+ * Get Bootstrap icon class for a file extension
+ */
+function getFileTypeIcon($ext) {
+    if (in_array($ext, ['jpg', 'jpeg', 'png', 'gif'])) return 'bi-file-earmark-image text-success';
+    if ($ext === 'pdf') return 'bi-file-earmark-pdf text-danger';
+    if (in_array($ext, ['doc', 'docx'])) return 'bi-file-earmark-word text-primary';
+    if (in_array($ext, ['xls', 'xlsx'])) return 'bi-file-earmark-excel text-success';
+    if (in_array($ext, ['ppt', 'pptx'])) return 'bi-file-earmark-ppt text-warning';
+    if (in_array($ext, ['mp4', 'avi', 'mov'])) return 'bi-camera-video text-info';
+    if ($ext === 'mp3') return 'bi-music-note-beamed text-purple';
+    if (in_array($ext, ['dwg', 'dxf'])) return 'bi-rulers text-secondary';
+    if (in_array($ext, ['skp', 'rvt'])) return 'bi-building text-secondary';
+    if (in_array($ext, ['zip', 'rar'])) return 'bi-file-earmark-zip text-warning';
+    return 'bi-file-earmark text-muted';
+}
+
+/**
+ * Generate a safe, unique filename for uploads
+ */
+function generateSafeFilename($originalName, $index = null) {
+    $safe = preg_replace('/[^a-zA-Z0-9._-]/', '_', $originalName);
+    $prefix = $index !== null ? time() . '_' . $index . '_' : time() . '_';
+    return $prefix . $safe;
+}
+
+/**
+ * Validate a single uploaded file (size + extension).
+ * Returns null on success, or an error message string on failure.
+ */
+function validateUpload($fileName, $fileSize) {
+    if ($fileSize > MAX_FILE_SIZE) {
+        return $fileName . ': exceeds 50MB limit.';
+    }
+    $ext = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
+    if (!in_array($ext, ALLOWED_EXTENSIONS)) {
+        return $fileName . ': file type not allowed.';
+    }
+    if (in_array($ext, ALLOWED_IMAGE_EXTENSIONS) && $fileSize > MAX_IMAGE_SIZE) {
+        return $fileName . ': image exceeds 10MB limit.';
+    }
+    return null;
 }

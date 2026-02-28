@@ -80,27 +80,6 @@ $projects = $stmt->fetchAll();
 // Available fiscal years
 $years = $pdo->query("SELECT DISTINCT fiscal_year FROM projects WHERE is_deleted = 0 ORDER BY fiscal_year DESC")->fetchAll(PDO::FETCH_COLUMN);
 
-// Status badge helper
-function listStatusBadge($status) {
-    $map = [
-        'Not Started' => 'bg-secondary',
-        'In Progress' => 'bg-info',
-        'On Hold'     => 'bg-warning text-dark',
-        'Completed'   => 'bg-success',
-        'Cancelled'   => 'bg-danger',
-    ];
-    return '<span class="badge ' . ($map[$status] ?? 'bg-secondary') . '">' . sanitize($status) . '</span>';
-}
-
-function priorityBadge($priority) {
-    $map = [
-        'High'   => 'badge-high',
-        'Medium' => 'badge-medium',
-        'Low'    => 'badge-low',
-    ];
-    return '<span class="badge ' . ($map[$priority] ?? 'bg-secondary') . '">' . sanitize($priority) . '</span>';
-}
-
 // Build filter query string helper (preserves other filters)
 function filterUrl($overrides = []) {
     $params = array_merge($_GET, $overrides);
@@ -141,15 +120,16 @@ function filterUrl($overrides = []) {
                 <label class="form-label small mb-1">Department</label>
                 <select name="department" class="form-select form-select-sm">
                     <option value="">All Depts</option>
-                    <option value="CEO" <?= $filterDepartment === 'CEO' ? 'selected' : '' ?>>CEO</option>
-                    <option value="Mayors" <?= $filterDepartment === 'Mayors' ? 'selected' : '' ?>>Mayors</option>
+                    <?php foreach (getDepartments($pdo) as $dept): ?>
+                        <option value="<?= sanitize($dept) ?>" <?= $filterDepartment === $dept ? 'selected' : '' ?>><?= sanitize($dept) ?></option>
+                    <?php endforeach; ?>
                 </select>
             </div>
             <div class="col-md-2">
                 <label class="form-label small mb-1">Status</label>
                 <select name="status" class="form-select form-select-sm">
                     <option value="">All Status</option>
-                    <?php foreach (['Not Started', 'In Progress', 'On Hold', 'Completed', 'Cancelled'] as $s): ?>
+                    <?php foreach (STATUS_OPTIONS as $s): ?>
                         <option value="<?= $s ?>" <?= $filterStatus === $s ? 'selected' : '' ?>><?= $s ?></option>
                     <?php endforeach; ?>
                 </select>
@@ -223,8 +203,8 @@ function filterUrl($overrides = []) {
                             </a>
                         </td>
                         <td><span class="badge <?= getClassificationBadgeClass($proj) ?>"><?= sanitize(getClassificationLabel($proj)) ?></span></td>
-                        <td><?= priorityBadge($proj['priority']) ?></td>
-                        <td><?= listStatusBadge($proj['status']) ?></td>
+                        <td><span class="badge <?= priorityBadgeClass($proj['priority']) ?>"><?= sanitize($proj['priority']) ?></span></td>
+                        <td><span class="badge <?= statusBadgeClass($proj['status']) ?>"><?= sanitize($proj['status']) ?></span></td>
                         <td class="text-end"><?= formatCurrency($proj['budget_allocated']) ?></td>
                         <td class="small"><?= formatDate($proj['start_date']) ?></td>
                         <td>

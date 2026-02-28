@@ -2,50 +2,10 @@
 $pageTitle = 'Dashboard';
 require_once __DIR__ . '/includes/header.php';
 
-// Get fiscal year from query param or settings
 $fiscalYear = isset($_GET['year']) ? (int)$_GET['year'] : (int)$currentFiscalYear;
-
-// Dashboard stats
 $counts = getProjectCounts($pdo, $fiscalYear);
 
-// Overdue projects
-$stmtOverdue = $pdo->prepare("
-    SELECT id, title, project_type, visibility, department, project_subtype, target_end_date, status
-    FROM projects
-    WHERE is_deleted = 0 AND is_archived = 0 AND fiscal_year = ?
-      AND status NOT IN ('Completed', 'Cancelled')
-      AND target_end_date IS NOT NULL AND target_end_date < CURDATE()
-    ORDER BY target_end_date ASC
-    LIMIT 5
-");
-$stmtOverdue->execute([$fiscalYear]);
-$overdueProjects = $stmtOverdue->fetchAll();
-
-// Recent projects (last 5 updated)
-$stmtRecent = $pdo->prepare("
-    SELECT id, title, project_type, visibility, department, project_subtype, status, updated_at
-    FROM projects
-    WHERE is_deleted = 0 AND is_archived = 0 AND fiscal_year = ?
-    ORDER BY updated_at DESC
-    LIMIT 5
-");
-$stmtRecent->execute([$fiscalYear]);
-$recentProjects = $stmtRecent->fetchAll();
-
-// Upcoming deadlines (next 30 days)
-$stmtUpcoming = $pdo->prepare("
-    SELECT id, title, project_type, visibility, department, project_subtype, target_end_date, status
-    FROM projects
-    WHERE is_deleted = 0 AND is_archived = 0 AND fiscal_year = ?
-      AND status NOT IN ('Completed', 'Cancelled')
-      AND target_end_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 30 DAY)
-    ORDER BY target_end_date ASC
-    LIMIT 5
-");
-$stmtUpcoming->execute([$fiscalYear]);
-$upcomingProjects = $stmtUpcoming->fetchAll();
-
-// Available fiscal years for dropdown
+// Available fiscal years
 $stmtYears = $pdo->query("SELECT DISTINCT fiscal_year FROM projects WHERE is_deleted = 0 ORDER BY fiscal_year DESC");
 $availableYears = $stmtYears->fetchAll(PDO::FETCH_COLUMN);
 if (!in_array($fiscalYear, $availableYears)) {
@@ -53,138 +13,190 @@ if (!in_array($fiscalYear, $availableYears)) {
     rsort($availableYears);
 }
 
-// Status badge helper
-function statusBadgeClass($status) {
-    $map = [
-        'Not Started' => 'badge-not-started',
-        'In Progress' => 'badge-in-progress',
-        'On Hold'     => 'badge-on-hold',
-        'Completed'   => 'badge-completed',
-        'Cancelled'   => 'badge-cancelled',
-    ];
-    return $map[$status] ?? 'bg-secondary';
-}
+// Total overdue count
+$stmtOverdueCount = $pdo->prepare("
+    SELECT COUNT(*) FROM projects
+    WHERE is_deleted = 0 AND is_archived = 0 AND fiscal_year = ?
+      AND status NOT IN ('Completed', 'Cancelled')
+      AND target_end_date IS NOT NULL AND target_end_date < CURDATE()
+");
+$stmtOverdueCount->execute([$fiscalYear]);
+$totalOverdueCount = (int)$stmtOverdueCount->fetchColumn();
+
+// Overdue projects (with days overdue)
+$stmtOverdue = $pdo->prepare("
+    SELECT id, title, visibility, department, project_subtype, target_end_date, status, priority,
+           DATEDIFF(CURDATE(), target_end_date) as days_overdue
+    FROM projects
+    WHERE is_deleted = 0 AND is_archived = 0 AND fiscal_year = ?
+      AND status NOT IN ('Completed', 'Cancelled')
+      AND target_end_date IS NOT NULL AND target_end_date < CURDATE()
+    ORDER BY days_overdue DESC
+    LIMIT 5
+");
+$stmtOverdue->execute([$fiscalYear]);
+$overdueProjects = $stmtOverdue->fetchAll();
+
+// At-risk projects (due within 7 days)
+$stmtAtRisk = $pdo->prepare("
+    SELECT id, title, visibility, department, project_subtype, target_end_date, status, priority,
+           DATEDIFF(target_end_date, CURDATE()) as days_left
+    FROM projects
+    WHERE is_deleted = 0 AND is_archived = 0 AND fiscal_year = ?
+      AND status NOT IN ('Completed', 'Cancelled')
+      AND target_end_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY)
+    ORDER BY target_end_date ASC
+    LIMIT 5
+");
+$stmtAtRisk->execute([$fiscalYear]);
+$atRiskProjects = $stmtAtRisk->fetchAll();
+
+// Upcoming milestones (next 14 days)
+$stmtMilestones = $pdo->prepare("
+    SELECT m.title, m.target_date, p.id as project_id, p.title as project_title
+    FROM milestones m
+    JOIN projects p ON m.project_id = p.id
+    WHERE p.is_deleted = 0 AND p.is_archived = 0 AND p.fiscal_year = ?
+      AND m.status = 'Pending' AND m.target_date IS NOT NULL
+      AND m.target_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 14 DAY)
+    ORDER BY m.target_date ASC
+    LIMIT 6
+");
+$stmtMilestones->execute([$fiscalYear]);
+$upcomingMilestones = $stmtMilestones->fetchAll();
+
+// Overdue milestones count
+$stmtOverdueMilestones = $pdo->prepare("
+    SELECT COUNT(*) FROM milestones m
+    JOIN projects p ON m.project_id = p.id
+    WHERE p.is_deleted = 0 AND p.is_archived = 0 AND p.fiscal_year = ?
+      AND m.status = 'Pending' AND m.target_date IS NOT NULL AND m.target_date < CURDATE()
+");
+$stmtOverdueMilestones->execute([$fiscalYear]);
+$overdueMilestoneCount = (int)$stmtOverdueMilestones->fetchColumn();
+
+// Recent activity logs
+$stmtLogs = $pdo->prepare("
+    SELECT al.action_taken, al.log_date, al.logged_by,
+           p.id as project_id, p.title as project_title
+    FROM action_logs al
+    JOIN projects p ON al.project_id = p.id
+    WHERE p.is_deleted = 0 AND p.is_archived = 0 AND p.fiscal_year = ?
+    ORDER BY al.created_at DESC
+    LIMIT 8
+");
+$stmtLogs->execute([$fiscalYear]);
+$recentLogs = $stmtLogs->fetchAll();
+
+// Recent projects
+$stmtRecent = $pdo->prepare("
+    SELECT id, title, visibility, department, project_subtype, status, priority,
+           budget_allocated, updated_at
+    FROM projects
+    WHERE is_deleted = 0 AND is_archived = 0 AND fiscal_year = ?
+    ORDER BY updated_at DESC
+    LIMIT 6
+");
+$stmtRecent->execute([$fiscalYear]);
+$recentProjects = $stmtRecent->fetchAll();
+
+// Upcoming deadlines (next 30 days)
+$stmtUpcoming = $pdo->prepare("
+    SELECT id, title, visibility, department, project_subtype, target_end_date, status,
+           DATEDIFF(target_end_date, CURDATE()) as days_left
+    FROM projects
+    WHERE is_deleted = 0 AND is_archived = 0 AND fiscal_year = ?
+      AND status NOT IN ('Completed', 'Cancelled')
+      AND target_end_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 30 DAY)
+    ORDER BY target_end_date ASC
+    LIMIT 8
+");
+$stmtUpcoming->execute([$fiscalYear]);
+$upcomingDeadlines = $stmtUpcoming->fetchAll();
+
+$completionRate = $counts['total'] > 0 ? round(($counts['completed'] / $counts['total']) * 100) : 0;
+$hasAttentionItems = $totalOverdueCount > 0 || count($atRiskProjects) > 0 || $overdueMilestoneCount > 0;
 ?>
 
 <!-- Page Header -->
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h4 class="mb-0 fw-bold">Dashboard</h4>
-    <form method="GET" class="d-flex align-items-center">
-        <label class="me-2 text-muted small">FY:</label>
-        <select name="year" class="form-select form-select-sm" style="width: auto;" onchange="this.form.submit()">
-            <?php foreach ($availableYears as $yr): ?>
-                <option value="<?= $yr ?>" <?= $yr == $fiscalYear ? 'selected' : '' ?>><?= $yr ?></option>
-            <?php endforeach; ?>
-        </select>
-    </form>
-</div>
-
-<!-- Summary Cards Row 1 -->
-<div class="row g-3 mb-4">
-    <!-- Total Projects -->
-    <div class="col-xl-3 col-md-6">
-        <div class="card stat-card shadow-sm">
-            <div class="card-body d-flex align-items-center">
-                <div class="stat-icon bg-primary bg-opacity-10 text-primary me-3">
-                    <i class="bi bi-folder"></i>
-                </div>
-                <div>
-                    <div class="stat-value"><?= $counts['total'] ?></div>
-                    <div class="stat-label">Total Projects</div>
-                </div>
-            </div>
-        </div>
+    <div>
+        <h4 class="mb-0 fw-bold">Dashboard</h4>
+        <small class="text-muted">FY <?= $fiscalYear ?> Overview</small>
     </div>
-    <!-- Not Started -->
-    <div class="col-xl-3 col-md-6">
-        <div class="card stat-card shadow-sm">
-            <div class="card-body d-flex align-items-center">
-                <div class="stat-icon bg-secondary bg-opacity-10 text-secondary me-3">
-                    <i class="bi bi-clock"></i>
-                </div>
-                <div>
-                    <div class="stat-value"><?= $counts['not_started'] ?></div>
-                    <div class="stat-label">Not Started</div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <!-- In Progress -->
-    <div class="col-xl-3 col-md-6">
-        <div class="card stat-card shadow-sm">
-            <div class="card-body d-flex align-items-center">
-                <div class="stat-icon bg-info bg-opacity-10 text-info me-3">
-                    <i class="bi bi-arrow-repeat"></i>
-                </div>
-                <div>
-                    <div class="stat-value"><?= $counts['in_progress'] ?></div>
-                    <div class="stat-label">In Progress</div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <!-- Completed -->
-    <div class="col-xl-3 col-md-6">
-        <div class="card stat-card shadow-sm">
-            <div class="card-body d-flex align-items-center">
-                <div class="stat-icon bg-success bg-opacity-10 text-success me-3">
-                    <i class="bi bi-check-circle"></i>
-                </div>
-                <div>
-                    <div class="stat-value"><?= $counts['completed'] ?></div>
-                    <div class="stat-label">Completed</div>
-                </div>
-            </div>
-        </div>
+    <div class="d-flex align-items-center gap-2">
+        <form method="GET" class="d-flex align-items-center">
+            <label class="me-2 text-muted small">FY:</label>
+            <select name="year" class="form-select form-select-sm" style="width: auto;" onchange="this.form.submit()">
+                <?php foreach ($availableYears as $yr): ?>
+                    <option value="<?= $yr ?>" <?= $yr == $fiscalYear ? 'selected' : '' ?>><?= $yr ?></option>
+                <?php endforeach; ?>
+            </select>
+        </form>
+        <a href="<?= BASE_URL ?>/pages/projects/create.php" class="btn btn-primary btn-sm">
+            <i class="bi bi-plus-lg me-1"></i>New Project
+        </a>
     </div>
 </div>
 
-<!-- Summary Cards Row 2 -->
+<!-- Stat Cards -->
 <div class="row g-3 mb-4">
-    <!-- On Hold -->
-    <div class="col-xl-3 col-md-6">
-        <div class="card stat-card shadow-sm">
-            <div class="card-body d-flex align-items-center">
-                <div class="stat-icon bg-warning bg-opacity-10 text-warning me-3">
-                    <i class="bi bi-pause-circle"></i>
-                </div>
-                <div>
-                    <div class="stat-value"><?= $counts['on_hold'] ?></div>
-                    <div class="stat-label">On Hold</div>
-                </div>
+    <div class="col-xl col-md-4 col-6">
+        <div class="card stat-card shadow-sm h-100">
+            <div class="card-body text-center py-3">
+                <div class="stat-value"><?= $counts['total'] ?></div>
+                <div class="stat-label">Total Projects</div>
+                <?php if ($counts['on_hold'] > 0 || $counts['cancelled'] > 0): ?>
+                    <small class="text-muted">
+                        <?= $counts['on_hold'] ?> on hold<?= $counts['cancelled'] > 0 ? ' · ' . $counts['cancelled'] . ' cancelled' : '' ?>
+                    </small>
+                <?php else: ?>
+                    <small class="text-muted"><?= $counts['not_started'] ?> not started</small>
+                <?php endif; ?>
             </div>
         </div>
     </div>
-    <!-- Total Budget -->
-    <div class="col-xl-3 col-md-6">
-        <div class="card stat-card shadow-sm">
-            <div class="card-body d-flex align-items-center">
-                <div class="stat-icon bg-primary bg-opacity-10 text-primary me-3">
-                    <i class="bi bi-wallet2"></i>
-                </div>
-                <div>
-                    <div class="stat-value"><?= formatCurrency($counts['total_budget']) ?></div>
-                    <div class="stat-label">Total Budget</div>
-                </div>
+    <div class="col-xl col-md-4 col-6">
+        <div class="card stat-card shadow-sm h-100 border-start border-3 border-info">
+            <div class="card-body text-center py-3">
+                <div class="stat-value text-info"><?= $counts['in_progress'] ?></div>
+                <div class="stat-label">In Progress</div>
             </div>
         </div>
     </div>
-    <!-- Utilization -->
-    <div class="col-xl-6 col-md-12">
-        <div class="card stat-card shadow-sm">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                    <span class="stat-label">Budget Utilization</span>
+    <div class="col-xl col-md-4 col-6">
+        <div class="card stat-card shadow-sm h-100 border-start border-3 border-success">
+            <div class="card-body text-center py-3">
+                <div class="stat-value text-success"><?= $counts['completed'] ?></div>
+                <div class="stat-label">Completed</div>
+                <small class="text-muted"><?= $completionRate ?>% rate</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl col-md-4 col-6">
+        <div class="card stat-card shadow-sm h-100 <?= $totalOverdueCount > 0 ? 'border-start border-3 border-danger stat-card-alert' : '' ?>">
+            <div class="card-body text-center py-3">
+                <div class="stat-value <?= $totalOverdueCount > 0 ? 'text-danger' : '' ?>"><?= $totalOverdueCount ?></div>
+                <div class="stat-label">Overdue</div>
+                <?php if ($totalOverdueCount > 0): ?>
+                    <small class="text-danger"><i class="bi bi-exclamation-circle"></i> Needs attention</small>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl col-md-8 col-12">
+        <div class="card stat-card shadow-sm h-100">
+            <div class="card-body py-3">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <div class="stat-label mb-0">Budget Utilization</div>
                     <span class="fw-bold"><?= $counts['utilization'] ?>%</span>
                 </div>
-                <div class="progress" style="height: 10px;">
-                    <div class="progress-bar bg-<?= $counts['utilization'] > 90 ? 'danger' : ($counts['utilization'] > 70 ? 'warning' : 'success') ?>"
-                         role="progressbar"
-                         style="width: <?= min($counts['utilization'], 100) ?>%">
-                    </div>
+                <div class="progress mb-2" style="height: 8px;">
+                    <div class="progress-bar bg-<?= $counts['utilization'] > 90 ? 'danger' : ($counts['utilization'] > 70 ? 'warning' : 'primary') ?>"
+                         style="width: <?= min($counts['utilization'], 100) ?>%"></div>
                 </div>
-                <div class="d-flex justify-content-between mt-2">
-                    <small class="text-muted">Actual: <?= formatCurrency($counts['total_actual']) ?></small>
+                <div class="d-flex justify-content-between">
+                    <small class="text-muted">Spent: <?= formatCurrency($counts['total_actual']) ?></small>
                     <small class="text-muted">Budget: <?= formatCurrency($counts['total_budget']) ?></small>
                 </div>
             </div>
@@ -192,11 +204,75 @@ function statusBadgeClass($status) {
     </div>
 </div>
 
+<!-- Attention Needed -->
+<?php if ($hasAttentionItems): ?>
+<div class="card shadow-sm border-start border-4 border-danger mb-4">
+    <div class="card-header bg-danger bg-opacity-10 d-flex align-items-center justify-content-between py-2">
+        <div>
+            <i class="bi bi-exclamation-triangle-fill text-danger me-2"></i>
+            <span class="fw-semibold">Attention Needed</span>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+            <?php if ($totalOverdueCount > 0): ?>
+                <span class="badge bg-danger"><?= $totalOverdueCount ?> overdue project<?= $totalOverdueCount > 1 ? 's' : '' ?></span>
+            <?php endif; ?>
+            <?php if (count($atRiskProjects) > 0): ?>
+                <span class="badge bg-warning text-dark"><?= count($atRiskProjects) ?> due this week</span>
+            <?php endif; ?>
+            <?php if ($overdueMilestoneCount > 0): ?>
+                <span class="badge bg-secondary"><?= $overdueMilestoneCount ?> milestone<?= $overdueMilestoneCount > 1 ? 's' : '' ?> overdue</span>
+            <?php endif; ?>
+        </div>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0 small">
+                <tbody>
+                    <?php foreach ($overdueProjects as $proj): ?>
+                    <tr>
+                        <td style="width: 20px;" class="ps-3">
+                            <span class="d-inline-block rounded-circle bg-danger" style="width:8px;height:8px;"></span>
+                        </td>
+                        <td class="fw-medium">
+                            <a href="<?= BASE_URL ?>/pages/projects/view.php?id=<?= $proj['id'] ?>" class="text-decoration-none text-dark">
+                                <?= sanitize($proj['title']) ?>
+                            </a>
+                        </td>
+                        <td><span class="badge <?= statusBadgeClass($proj['status']) ?>"><?= sanitize($proj['status']) ?></span></td>
+                        <td class="text-danger fw-medium"><?= $proj['days_overdue'] ?> day<?= $proj['days_overdue'] != 1 ? 's' : '' ?> overdue</td>
+                        <td class="text-end pe-3">
+                            <a href="<?= BASE_URL ?>/pages/projects/view.php?id=<?= $proj['id'] ?>" class="btn btn-sm btn-outline-danger py-0">View</a>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                    <?php foreach ($atRiskProjects as $proj): ?>
+                    <tr>
+                        <td style="width: 20px;" class="ps-3">
+                            <span class="d-inline-block rounded-circle bg-warning" style="width:8px;height:8px;"></span>
+                        </td>
+                        <td class="fw-medium">
+                            <a href="<?= BASE_URL ?>/pages/projects/view.php?id=<?= $proj['id'] ?>" class="text-decoration-none text-dark">
+                                <?= sanitize($proj['title']) ?>
+                            </a>
+                        </td>
+                        <td><span class="badge <?= statusBadgeClass($proj['status']) ?>"><?= sanitize($proj['status']) ?></span></td>
+                        <td class="text-warning fw-medium">Due in <?= $proj['days_left'] ?> day<?= $proj['days_left'] != 1 ? 's' : '' ?></td>
+                        <td class="text-end pe-3">
+                            <a href="<?= BASE_URL ?>/pages/projects/view.php?id=<?= $proj['id'] ?>" class="btn btn-sm btn-outline-warning py-0">View</a>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
 <!-- Charts Row -->
 <div class="row g-3 mb-4">
-    <!-- Pie Chart: Projects by Status -->
-    <div class="col-lg-6">
-        <div class="card shadow-sm">
+    <div class="col-lg-5">
+        <div class="card shadow-sm h-100">
             <div class="card-header bg-white">
                 <h6 class="mb-0 section-title">Projects by Status</h6>
             </div>
@@ -207,9 +283,8 @@ function statusBadgeClass($status) {
             </div>
         </div>
     </div>
-    <!-- Bar Chart: Budget by Department -->
-    <div class="col-lg-6">
-        <div class="card shadow-sm">
+    <div class="col-lg-7">
+        <div class="card shadow-sm h-100">
             <div class="card-header bg-white">
                 <h6 class="mb-0 section-title">Budget by Department</h6>
             </div>
@@ -222,123 +297,173 @@ function statusBadgeClass($status) {
     </div>
 </div>
 
-<!-- Overdue Projects -->
-<?php if (!empty($overdueProjects)): ?>
+<!-- Three-Column Info Panels -->
 <div class="row g-3 mb-4">
-    <div class="col-12">
-        <div class="card shadow-sm border-danger border-start border-4">
-            <div class="card-header bg-white d-flex align-items-center">
-                <i class="bi bi-exclamation-triangle text-danger me-2"></i>
-                <h6 class="mb-0 section-title">Overdue Projects</h6>
+    <!-- Upcoming Milestones -->
+    <div class="col-lg-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center py-2">
+                <h6 class="mb-0 section-title"><i class="bi bi-flag me-1 text-primary"></i>Milestones</h6>
+                <small class="text-muted">next 14 days</small>
             </div>
-            <div class="card-body p-0">
-                <div class="table-responsive">
-                    <table class="table table-hover mb-0">
-                        <thead>
-                            <tr>
-                                <th>Title</th>
-                                <th>Classification</th>
-                                <th>Due Date</th>
-                                <th>Status</th>
-                                <th></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach ($overdueProjects as $proj): ?>
-                            <tr>
-                                <td class="fw-medium"><?= sanitize($proj['title']) ?></td>
-                                <td><span class="badge <?= getClassificationBadgeClass($proj) ?>"><?= sanitize(getClassificationLabel($proj)) ?></span></td>
-                                <td class="text-danger"><?= formatDate($proj['target_end_date']) ?></td>
-                                <td><span class="badge <?= statusBadgeClass($proj['status']) ?>"><?= sanitize($proj['status']) ?></span></td>
-                                <td><a href="<?= BASE_URL ?>/pages/projects/view.php?id=<?= $proj['id'] ?>" class="btn btn-sm btn-outline-primary">View</a></td>
-                            </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                </div>
+            <div class="card-body py-2">
+                <?php if (empty($upcomingMilestones)): ?>
+                    <div class="text-center text-muted py-4">
+                        <i class="bi bi-flag fs-3 d-block mb-2 opacity-50"></i>
+                        No upcoming milestones
+                    </div>
+                <?php else: ?>
+                    <div class="d-flex flex-column gap-1">
+                        <?php foreach ($upcomingMilestones as $ms): ?>
+                        <div class="d-flex align-items-start gap-2 p-2 rounded dash-list-item">
+                            <i class="bi bi-flag-fill text-primary small mt-1"></i>
+                            <div class="flex-grow-1" style="min-width: 0;">
+                                <div class="fw-medium small text-truncate"><?= sanitize($ms['title']) ?></div>
+                                <div class="text-muted" style="font-size: 0.75rem;">
+                                    <a href="<?= BASE_URL ?>/pages/projects/view.php?id=<?= $ms['project_id'] ?>&tab=milestones" class="text-decoration-none">
+                                        <?= sanitize($ms['project_title']) ?>
+                                    </a>
+                                    &middot; <?= formatDate($ms['target_date']) ?>
+                                </div>
+                            </div>
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
             </div>
         </div>
     </div>
-</div>
-<?php endif; ?>
 
-<!-- Recent Projects & Upcoming Deadlines -->
-<div class="row g-3 mb-4">
-    <!-- Recent Projects -->
-    <div class="col-lg-7">
-        <div class="card shadow-sm">
-            <div class="card-header bg-white">
-                <h6 class="mb-0 section-title">Recent Projects</h6>
+    <!-- Recent Activity -->
+    <div class="col-lg-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center py-2">
+                <h6 class="mb-0 section-title"><i class="bi bi-activity me-1 text-info"></i>Activity</h6>
+                <small class="text-muted">recent</small>
             </div>
-            <div class="card-body p-0">
-                <?php if (empty($recentProjects)): ?>
-                    <div class="p-4 text-center text-muted">
-                        <i class="bi bi-inbox fs-1 d-block mb-2"></i>
-                        No projects yet. <a href="<?= BASE_URL ?>/pages/projects/create.php">Create one</a>.
+            <div class="card-body py-2">
+                <?php if (empty($recentLogs)): ?>
+                    <div class="text-center text-muted py-4">
+                        <i class="bi bi-journal-text fs-3 d-block mb-2 opacity-50"></i>
+                        No recent activity
                     </div>
                 <?php else: ?>
-                <div class="table-responsive">
-                    <table class="table table-hover mb-0">
-                        <thead>
-                            <tr>
-                                <th>Title</th>
-                                <th>Classification</th>
-                                <th>Status</th>
-                                <th></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach ($recentProjects as $proj): ?>
-                            <tr>
-                                <td class="fw-medium"><?= sanitize($proj['title']) ?></td>
-                                <td><span class="badge <?= getClassificationBadgeClass($proj) ?>"><?= sanitize(getClassificationLabel($proj)) ?></span></td>
-                                <td><span class="badge <?= statusBadgeClass($proj['status']) ?>"><?= sanitize($proj['status']) ?></span></td>
-                                <td><a href="<?= BASE_URL ?>/pages/projects/view.php?id=<?= $proj['id'] ?>" class="btn btn-sm btn-outline-primary">View</a></td>
-                            </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                </div>
+                    <div class="d-flex flex-column gap-1">
+                        <?php foreach ($recentLogs as $log): ?>
+                        <div class="d-flex align-items-start gap-2 p-2 rounded dash-list-item">
+                            <i class="bi bi-circle-fill text-muted mt-2" style="font-size: 0.35rem;"></i>
+                            <div class="flex-grow-1" style="min-width: 0;">
+                                <div class="small text-truncate"><?= sanitize($log['action_taken']) ?></div>
+                                <div class="text-muted" style="font-size: 0.75rem;">
+                                    <a href="<?= BASE_URL ?>/pages/projects/view.php?id=<?= $log['project_id'] ?>&tab=log" class="text-decoration-none">
+                                        <?= sanitize($log['project_title']) ?>
+                                    </a>
+                                    <?php if (!empty($log['logged_by'])): ?>
+                                        &middot; <?= sanitize($log['logged_by']) ?>
+                                    <?php endif; ?>
+                                    &middot; <?= formatDate($log['log_date']) ?>
+                                </div>
+                            </div>
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
                 <?php endif; ?>
             </div>
         </div>
     </div>
 
     <!-- Upcoming Deadlines -->
-    <div class="col-lg-5">
-        <div class="card shadow-sm">
-            <div class="card-header bg-white">
-                <h6 class="mb-0 section-title">Upcoming Deadlines <small class="text-muted">(next 30 days)</small></h6>
+    <div class="col-lg-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center py-2">
+                <h6 class="mb-0 section-title"><i class="bi bi-calendar-event me-1 text-warning"></i>Deadlines</h6>
+                <small class="text-muted">next 30 days</small>
             </div>
-            <div class="card-body">
-                <?php if (empty($upcomingProjects)): ?>
-                    <div class="text-center text-muted py-3">
-                        <i class="bi bi-calendar-check fs-1 d-block mb-2"></i>
-                        No upcoming deadlines.
+            <div class="card-body py-2">
+                <?php if (empty($upcomingDeadlines)): ?>
+                    <div class="text-center text-muted py-4">
+                        <i class="bi bi-calendar-check fs-3 d-block mb-2 opacity-50"></i>
+                        No upcoming deadlines
                     </div>
                 <?php else: ?>
-                    <ul class="list-group list-group-flush">
-                        <?php foreach ($upcomingProjects as $proj): ?>
-                        <li class="list-group-item d-flex justify-content-between align-items-center px-0">
-                            <div>
-                                <div class="fw-medium"><?= sanitize($proj['title']) ?></div>
-                                <small class="text-muted"><?= formatDate($proj['target_end_date']) ?></small>
+                    <div class="d-flex flex-column gap-1">
+                        <?php foreach ($upcomingDeadlines as $proj): ?>
+                        <div class="d-flex align-items-center gap-2 p-2 rounded dash-list-item">
+                            <div class="text-center" style="min-width: 36px;">
+                                <div class="fw-bold small lh-1 <?= $proj['days_left'] <= 3 ? 'text-danger' : ($proj['days_left'] <= 7 ? 'text-warning' : 'text-muted') ?>">
+                                    <?= $proj['days_left'] ?>
+                                </div>
+                                <div style="font-size: 0.6rem;" class="text-muted text-uppercase">days</div>
                             </div>
-                            <a href="<?= BASE_URL ?>/pages/projects/view.php?id=<?= $proj['id'] ?>" class="btn btn-sm btn-outline-primary">View</a>
-                        </li>
+                            <div class="flex-grow-1" style="min-width: 0;">
+                                <div class="fw-medium small text-truncate">
+                                    <a href="<?= BASE_URL ?>/pages/projects/view.php?id=<?= $proj['id'] ?>" class="text-decoration-none text-dark">
+                                        <?= sanitize($proj['title']) ?>
+                                    </a>
+                                </div>
+                                <div style="font-size: 0.75rem;">
+                                    <span class="text-muted"><?= formatDate($proj['target_end_date']) ?></span>
+                                    &middot;
+                                    <span class="badge <?= statusBadgeClass($proj['status']) ?>" style="font-size: 0.6rem;"><?= sanitize($proj['status']) ?></span>
+                                </div>
+                            </div>
+                        </div>
                         <?php endforeach; ?>
-                    </ul>
+                    </div>
                 <?php endif; ?>
             </div>
         </div>
     </div>
 </div>
 
+<!-- Recent Projects -->
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <h6 class="mb-0 section-title">Recent Projects</h6>
+        <a href="<?= BASE_URL ?>/pages/projects/list.php" class="btn btn-sm btn-outline-primary">View All</a>
+    </div>
+    <div class="card-body p-0">
+        <?php if (empty($recentProjects)): ?>
+            <div class="p-4 text-center text-muted">
+                <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+                No projects yet. <a href="<?= BASE_URL ?>/pages/projects/create.php">Create one</a>.
+            </div>
+        <?php else: ?>
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Title</th>
+                        <th>Classification</th>
+                        <th>Priority</th>
+                        <th>Status</th>
+                        <th>Budget</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($recentProjects as $proj): ?>
+                    <tr>
+                        <td class="fw-medium"><?= sanitize($proj['title']) ?></td>
+                        <td><span class="badge <?= getClassificationBadgeClass($proj) ?>"><?= sanitize(getClassificationLabel($proj)) ?></span></td>
+                        <td><span class="badge <?= priorityBadgeClass($proj['priority']) ?>"><?= sanitize($proj['priority']) ?></span></td>
+                        <td><span class="badge <?= statusBadgeClass($proj['status']) ?>"><?= sanitize($proj['status']) ?></span></td>
+                        <td class="text-muted small"><?= formatCurrency($proj['budget_allocated']) ?></td>
+                        <td><a href="<?= BASE_URL ?>/pages/projects/view.php?id=<?= $proj['id'] ?>" class="btn btn-sm btn-outline-primary py-0">View</a></td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+        <?php endif; ?>
+    </div>
+</div>
+
 <?php
-// Chart data passed to JS
+// Chart data
 $chartData = [
     'status' => [
-        'labels' => ['Not Started', 'In Progress', 'On Hold', 'Completed', 'Cancelled'],
+        'labels' => STATUS_OPTIONS,
         'data' => [
             $counts['not_started'],
             $counts['in_progress'],
@@ -348,21 +473,50 @@ $chartData = [
         ],
         'colors' => ['#6b7280', '#0891b2', '#d97706', '#059669', '#dc2626'],
     ],
-    'budget' => [
-        'labels' => ['CEO', 'Mayors', 'Private'],
-        'data' => [
-            (float)$counts['ceo_budget'],
-            (float)$counts['mayors_budget'],
-            (float)$counts['private_budget'],
-        ],
-        'colors' => ['#0891b2', '#1a56db', '#374151'],
-    ],
+    'budget' => (function() use ($pdo, $counts) {
+        $depts = getDepartments($pdo);
+        $labels = [];
+        $data = [];
+        $palette = ['#0891b2', '#1a56db', '#6366f1', '#8b5cf6', '#ec4899'];
+        $colors = [];
+        foreach ($depts as $i => $dept) {
+            $labels[] = $dept;
+            $data[] = (float)($counts[strtolower($dept) . '_budget'] ?? 0);
+            $colors[] = $palette[$i % count($palette)];
+        }
+        $labels[] = 'Private';
+        $data[] = (float)$counts['private_budget'];
+        $colors[] = '#374151';
+        return ['labels' => $labels, 'data' => $data, 'colors' => $colors];
+    })(),
 ];
 
 $pageScripts = '<script>
 const chartData = ' . json_encode($chartData) . ';
 
-// Status Pie Chart
+// Center text plugin for doughnut
+const centerTextPlugin = {
+    id: "centerText",
+    afterDraw(chart) {
+        if (chart.config.type !== "doughnut") return;
+        const { ctx, chartArea } = chart;
+        const centerX = (chartArea.left + chartArea.right) / 2;
+        const centerY = (chartArea.top + chartArea.bottom) / 2;
+        const total = chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
+        ctx.save();
+        ctx.font = "bold 1.5rem system-ui";
+        ctx.fillStyle = "#374151";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(total, centerX, centerY - 8);
+        ctx.font = "0.7rem system-ui";
+        ctx.fillStyle = "#6b7280";
+        ctx.fillText("TOTAL", centerX, centerY + 12);
+        ctx.restore();
+    }
+};
+
+// Status Doughnut
 new Chart(document.getElementById("statusChart"), {
     type: "doughnut",
     data: {
@@ -377,13 +531,15 @@ new Chart(document.getElementById("statusChart"), {
     options: {
         responsive: true,
         maintainAspectRatio: false,
+        cutout: "65%",
         plugins: {
-            legend: { position: "bottom", labels: { padding: 15, usePointStyle: true } }
+            legend: { position: "bottom", labels: { padding: 15, usePointStyle: true, pointStyle: "circle" } }
         }
-    }
+    },
+    plugins: [centerTextPlugin]
 });
 
-// Budget Bar Chart
+// Budget Bar (horizontal)
 new Chart(document.getElementById("budgetChart"), {
     type: "bar",
     data: {
@@ -393,17 +549,16 @@ new Chart(document.getElementById("budgetChart"), {
             data: chartData.budget.data,
             backgroundColor: chartData.budget.colors,
             borderRadius: 4,
-            barThickness: 50
+            barThickness: 28
         }]
     },
     options: {
+        indexAxis: "y",
         responsive: true,
         maintainAspectRatio: false,
-        plugins: {
-            legend: { display: false }
-        },
+        plugins: { legend: { display: false } },
         scales: {
-            y: {
+            x: {
                 beginAtZero: true,
                 ticks: {
                     callback: function(value) {

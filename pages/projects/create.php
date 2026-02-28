@@ -51,8 +51,9 @@ $categories = $pdo->query("SELECT id, name FROM categories ORDER BY name")->fetc
                     <label for="department" class="form-label">Department <span class="text-danger">*</span></label>
                     <select class="form-select" id="department" name="department">
                         <option value="">Select department...</option>
-                        <option value="CEO">CEO</option>
-                        <option value="Mayors">Mayors</option>
+                        <?php foreach (getDepartments($pdo) as $dept): ?>
+                            <option value="<?= sanitize($dept) ?>"><?= sanitize($dept) ?></option>
+                        <?php endforeach; ?>
                     </select>
                 </div>
                 <div class="col-md-4" id="subtypeGroup" style="display:none;">
@@ -85,20 +86,32 @@ $categories = $pdo->query("SELECT id, name FROM categories ORDER BY name")->fetc
         </div>
         <div class="card-body">
             <p class="text-muted small mb-3">Attach files for the Incoming Communication (letters, documents, images, etc.)</p>
-            <div id="fileInputs">
-                <div class="row g-2 mb-2 file-row">
-                    <div class="col-md-7">
-                        <input type="file" name="files[]" class="form-control form-control-sm">
-                    </div>
-                    <div class="col-md-5">
-                        <input type="text" name="file_descriptions[]" class="form-control form-control-sm" placeholder="Description (optional)">
-                    </div>
-                </div>
+            <div id="createDropZone" class="border border-2 border-dashed rounded-3 p-4 text-center mb-3"
+                 style="cursor:pointer; border-color:#adb5bd; transition: all 0.2s;">
+                <i class="bi bi-cloud-arrow-up fs-1 text-muted d-block mb-2"></i>
+                <p class="mb-1 fw-medium">Drag & drop files here</p>
+                <p class="text-muted small mb-2">or click to browse — select multiple files at once</p>
+                <button type="button" class="btn btn-outline-primary btn-sm" id="createBtnBrowse">
+                    <i class="bi bi-folder2-open me-1"></i> Browse Files
+                </button>
+                <input type="file" id="createFileInput" class="d-none" multiple
+                       accept=".<?= implode(',.', ALLOWED_EXTENSIONS) ?>">
             </div>
-            <button type="button" class="btn btn-outline-secondary btn-sm mt-2" id="addFileBtn">
-                <i class="bi bi-plus-lg me-1"></i> Add Another File
-            </button>
-            <div class="form-text mt-2">Max 10MB per file. Allowed: <?= implode(', ', ALLOWED_EXTENSIONS) ?></div>
+            <div id="createFileList" class="d-none mb-3">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <label class="form-label mb-0 fw-medium">Selected Files <span id="createFileCount" class="badge bg-primary ms-1">0</span></label>
+                    <button type="button" class="btn btn-outline-danger btn-sm" id="createBtnClear">
+                        <i class="bi bi-x-lg me-1"></i> Clear All
+                    </button>
+                </div>
+                <div id="createFileItems" style="max-height: 200px; overflow-y: auto;"></div>
+                <div class="text-muted small mt-1">Total size: <span id="createTotalSize">0 KB</span></div>
+            </div>
+            <div>
+                <label class="form-label">Description</label>
+                <input type="text" name="file_descriptions[]" class="form-control form-control-sm" placeholder="Optional label for all files">
+            </div>
+            <div class="form-text mt-2">Max 50MB per file. Allowed: <?= strtoupper(implode(', ', ALLOWED_EXTENSIONS)) ?></div>
         </div>
     </div>
 
@@ -113,10 +126,7 @@ $categories = $pdo->query("SELECT id, name FROM categories ORDER BY name")->fetc
 
 <?php
 $pageScripts = '<script>
-const subtypes = {
-    "CEO": ["Planning and Programming", "Construction"],
-    "Mayors": ["BDP", "SEF", "Special Projects"]
-};
+const subtypes = ' . json_encode(getDepartmentSubtypes($pdo)) . ';
 
 function updateClassification() {
     const vis = document.querySelector("input[name=visibility]:checked").value;
@@ -157,15 +167,105 @@ document.querySelectorAll("input[name=visibility]").forEach(function(r) {
 });
 document.getElementById("department").addEventListener("change", updateSubtypes);
 
-// Add more file inputs
-document.getElementById("addFileBtn").addEventListener("click", function() {
-    var row = document.createElement("div");
-    row.className = "row g-2 mb-2 file-row";
-    row.innerHTML = \'<div class="col-md-7"><input type="file" name="files[]" class="form-control form-control-sm"></div>\' +
-        \'<div class="col-md-4"><input type="text" name="file_descriptions[]" class="form-control form-control-sm" placeholder="Description (optional)"></div>\' +
-        \'<div class="col-md-1"><button type="button" class="btn btn-outline-danger btn-sm w-100" onclick="this.closest(\\\'.file-row\\\').remove()"><i class="bi bi-x-lg"></i></button></div>\';
-    document.getElementById("fileInputs").appendChild(row);
-});
+// Multi-file drag & drop for create page
+(function() {
+    const dropZone = document.getElementById("createDropZone");
+    const fileInput = document.getElementById("createFileInput");
+    const btnBrowse = document.getElementById("createBtnBrowse");
+    const fileList = document.getElementById("createFileList");
+    const fileItems = document.getElementById("createFileItems");
+    const fileCount = document.getElementById("createFileCount");
+    const totalSize = document.getElementById("createTotalSize");
+    const btnClear = document.getElementById("createBtnClear");
+
+    if (!dropZone) return;
+
+    let selectedFiles = [];
+
+    function formatSize(bytes) {
+        if (bytes >= 1048576) return (bytes / 1048576).toFixed(1) + " MB";
+        return (bytes / 1024).toFixed(1) + " KB";
+    }
+
+    function getIcon(ext) {
+        ext = ext.toLowerCase();
+        if (["jpg","jpeg","png","gif"].includes(ext)) return "bi-file-earmark-image text-success";
+        if (ext === "pdf") return "bi-file-earmark-pdf text-danger";
+        if (["doc","docx"].includes(ext)) return "bi-file-earmark-word text-primary";
+        if (["xls","xlsx"].includes(ext)) return "bi-file-earmark-excel text-success";
+        if (["mp4","avi","mov"].includes(ext)) return "bi-camera-video text-info";
+        if (["dwg","dxf","skp","rvt"].includes(ext)) return "bi-rulers text-secondary";
+        return "bi-file-earmark text-muted";
+    }
+
+    function renderList() {
+        fileItems.innerHTML = "";
+        if (selectedFiles.length === 0) {
+            fileList.classList.add("d-none");
+            return;
+        }
+        fileList.classList.remove("d-none");
+        fileCount.textContent = selectedFiles.length;
+        let total = 0;
+        selectedFiles.forEach(function(file, idx) {
+            total += file.size;
+            const ext = file.name.split(".").pop();
+            const isImg = ["jpg","jpeg","png","gif"].includes(ext.toLowerCase());
+            const row = document.createElement("div");
+            row.className = "d-flex align-items-center justify-content-between py-2 px-2 border-bottom";
+            row.innerHTML =
+                "<div class=\\"d-flex align-items-center gap-2 overflow-hidden\\">" +
+                    (isImg ? "<img src=\\"" + URL.createObjectURL(file) + "\\" style=\\"width:28px;height:28px;object-fit:cover;border-radius:4px;\\">" :
+                    "<i class=\\"bi " + getIcon(ext) + " fs-5\\"></i>") +
+                    "<div class=\\"overflow-hidden\\"><div class=\\"small fw-medium text-truncate\\" style=\\"max-width:400px;\\">" + file.name + "</div>" +
+                    "<div class=\\"text-muted\\" style=\\"font-size:0.7rem;\\">" + formatSize(file.size) + "</div></div>" +
+                "</div>" +
+                "<button type=\\"button\\" class=\\"btn btn-outline-danger btn-sm py-0 px-1\\" data-rm=\\"" + idx + "\\"><i class=\\"bi bi-x\\"></i></button>";
+            fileItems.appendChild(row);
+        });
+        totalSize.textContent = formatSize(total);
+        fileItems.querySelectorAll("[data-rm]").forEach(function(btn) {
+            btn.addEventListener("click", function() {
+                selectedFiles.splice(parseInt(this.dataset.rm), 1);
+                syncFiles(); renderList();
+            });
+        });
+    }
+
+    function syncFiles() {
+        const dt = new DataTransfer();
+        selectedFiles.forEach(function(f) { dt.items.add(f); });
+        fileInput.files = dt.files;
+    }
+
+    function addFiles(newFiles) {
+        for (let i = 0; i < newFiles.length; i++) {
+            const f = newFiles[i];
+            if (f.size > 52428800) continue;
+            const dup = selectedFiles.some(function(sf) { return sf.name === f.name && sf.size === f.size; });
+            if (!dup) selectedFiles.push(f);
+        }
+        syncFiles(); renderList();
+    }
+
+    btnBrowse.addEventListener("click", function(e) { e.stopPropagation(); fileInput.click(); });
+    dropZone.addEventListener("click", function() { fileInput.click(); });
+    fileInput.addEventListener("change", function() { if (this.files.length > 0) addFiles(this.files); });
+
+    dropZone.addEventListener("dragover", function(e) { e.preventDefault(); this.style.borderColor = "#1a56db"; this.style.backgroundColor = "#f0f4ff"; });
+    dropZone.addEventListener("dragleave", function(e) { e.preventDefault(); this.style.borderColor = "#adb5bd"; this.style.backgroundColor = ""; });
+    dropZone.addEventListener("drop", function(e) {
+        e.preventDefault(); this.style.borderColor = "#adb5bd"; this.style.backgroundColor = "";
+        if (e.dataTransfer.files.length > 0) addFiles(e.dataTransfer.files);
+    });
+
+    btnClear.addEventListener("click", function() { selectedFiles = []; fileInput.value = ""; renderList(); });
+
+    // On form submit, set the input name
+    document.querySelector("form").addEventListener("submit", function() {
+        fileInput.name = "files[]";
+    });
+})();
 </script>';
 
 require_once __DIR__ . '/../../includes/footer.php';

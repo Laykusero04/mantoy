@@ -33,7 +33,7 @@ switch ($action) {
                 flashMessage('danger', 'Department is required for public projects.');
                 redirect(BASE_URL . '/pages/projects/create.php');
             }
-            $validSubtypes = getDepartmentSubtypes();
+            $validSubtypes = getDepartmentSubtypes($pdo);
             if (!isset($validSubtypes[$department]) || !in_array($projectSubtype, $validSubtypes[$department])) {
                 flashMessage('danger', 'Invalid sub-type for the selected department.');
                 redirect(BASE_URL . '/pages/projects/create.php');
@@ -91,12 +91,9 @@ switch ($action) {
 
                 for ($i = 0; $i < count($_FILES['files']['name']); $i++) {
                     if ($_FILES['files']['error'][$i] !== UPLOAD_ERR_OK) continue;
-                    if ($_FILES['files']['size'][$i] > MAX_FILE_SIZE) continue;
+                    if (validateUpload($_FILES['files']['name'][$i], $_FILES['files']['size'][$i])) continue;
 
-                    $ext = strtolower(pathinfo($_FILES['files']['name'][$i], PATHINFO_EXTENSION));
-                    if (!in_array($ext, ALLOWED_EXTENSIONS)) continue;
-
-                    $storedName = time() . '_' . $i . '_' . preg_replace('/[^a-zA-Z0-9._-]/', '_', $_FILES['files']['name'][$i]);
+                    $storedName = generateSafeFilename($_FILES['files']['name'][$i], $i);
                     $destPath = $workflowDir . $storedName;
 
                     if (move_uploaded_file($_FILES['files']['tmp_name'][$i], $destPath)) {
@@ -151,7 +148,7 @@ switch ($action) {
                 flashMessage('danger', 'Department is required for public projects.');
                 redirect(BASE_URL . '/pages/projects/edit.php?id=' . $id);
             }
-            $validSubtypes = getDepartmentSubtypes();
+            $validSubtypes = getDepartmentSubtypes($pdo);
             if (!isset($validSubtypes[$department]) || !in_array($projectSubtype, $validSubtypes[$department])) {
                 flashMessage('danger', 'Invalid sub-type for the selected department.');
                 redirect(BASE_URL . '/pages/projects/edit.php?id=' . $id);

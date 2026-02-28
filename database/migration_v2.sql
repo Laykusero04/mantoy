@@ -461,6 +461,28 @@ CREATE TABLE IF NOT EXISTS calendar_events (
     INDEX idx_source (source_table, source_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Ensure optional calendar columns exist
+DELIMITER //
+CREATE PROCEDURE IF NOT EXISTS add_calendar_events_columns()
+BEGIN
+    -- show_on_main flag to control visibility on main calendar
+    IF NOT EXISTS (
+        SELECT 1
+        FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = 'bdpt_db'
+          AND TABLE_NAME = 'calendar_events'
+          AND COLUMN_NAME = 'show_on_main'
+    ) THEN
+        ALTER TABLE calendar_events
+            ADD COLUMN show_on_main TINYINT(1) NOT NULL DEFAULT 1
+            AFTER project_id;
+    END IF;
+END //
+DELIMITER ;
+
+CALL add_calendar_events_columns();
+DROP PROCEDURE IF EXISTS add_calendar_events_columns;
+
 
 -- ============================================
 -- 12. WORKFLOW DATA MIGRATION
@@ -514,8 +536,48 @@ JOIN workflow_stages ws ON ws.id = wa.stage_id;
 
 
 -- ============================================
+-- 14. DEPARTMENT & SUBTYPE LOOKUP TABLES
+-- ============================================
+CREATE TABLE IF NOT EXISTS departments (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL UNIQUE,
+    sort_order INT NOT NULL DEFAULT 0,
+    is_active TINYINT(1) NOT NULL DEFAULT 1
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS department_subtypes (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    department_id INT NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    sort_order INT NOT NULL DEFAULT 0,
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    FOREIGN KEY (department_id) REFERENCES departments(id) ON DELETE CASCADE,
+    UNIQUE KEY uk_dept_subtype (department_id, name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Seed departments (idempotent)
+INSERT IGNORE INTO departments (name, sort_order) VALUES ('CEO', 1), ('Mayors', 2);
+
+-- Seed subtypes (idempotent via subquery)
+INSERT INTO department_subtypes (department_id, name, sort_order)
+SELECT d.id, s.name, s.sort_order
+FROM departments d
+JOIN (
+    SELECT 'CEO' AS dept, 'Planning and Programming' AS name, 1 AS sort_order
+    UNION ALL SELECT 'CEO', 'Construction', 2
+    UNION ALL SELECT 'Mayors', 'BDP', 1
+    UNION ALL SELECT 'Mayors', 'SEF', 2
+    UNION ALL SELECT 'Mayors', 'Special Projects', 3
+) s ON d.name = s.dept
+WHERE NOT EXISTS (
+    SELECT 1 FROM department_subtypes ds
+    WHERE ds.department_id = d.id AND ds.name = s.name
+);
+
+
+-- ============================================
 -- MIGRATION COMPLETE
 -- ============================================
--- Expected table count: 25 active tables
+-- Expected table count: 27 active tables
 -- Run: SHOW TABLES FROM bdpt_db; to verify
 -- ============================================

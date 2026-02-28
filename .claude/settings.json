@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls -la \"c:\\\\xampp\\\\htdocs\\\\mantoy\\\\pages\\\\projects\\\\tabs\"\" 2>/dev/null || echo \"Directory listing failed \")",
+      "Bash(grep -n \"CREATE TABLE.*attachments\\\\|ALTER TABLE.*attachments\" c:/xampp/htdocs/mantoy/database/*.sql)",
+      "Bash(php -l includes/header.php)",
+      "Bash(php -l includes/footer.php)",
+      "Bash(mysql -u root bdpt_db -e \"SHOW TABLES\")",
+      "Bash(/c/xampp/mysql/bin/mysql -u root bdpt_db -e \"SHOW TABLES\")",
+      "Bash(/c/xampp/mysql/bin/mysql -u root bdpt_db -e \":*)"
+    ],
+    "additionalDirectories": [
+      "\\tmp"
+    ]
+  }
+}

@@ -19,7 +19,8 @@
       "Bash(c:/xampp/mysql/bin/mysql -u root bdpt_db -e \"SELECT module_type, COUNT\\(*\\) as cnt FROM attachments GROUP BY module_type;\")",
       "Bash(c:/xampp/mysql/bin/mysql -u root bdpt_db -e \"SELECT COUNT\\(*\\) as total FROM workflow_attachments;\")",
       "Bash(c:/xampp/mysql/bin/mysql -u root bdpt_db -e \"RENAME TABLE workflow_attachments TO _old_workflow_attachments; RENAME TABLE workflow_stages TO _old_workflow_stages;\")",
-      "Bash(c:/xampp/mysql/bin/mysql -u root bdpt_db -e \"SELECT id FROM projects WHERE is_deleted=0 LIMIT 1;\")"
+      "Bash(c:/xampp/mysql/bin/mysql -u root bdpt_db -e \"SELECT id FROM projects WHERE is_deleted=0 LIMIT 1;\")",
+      "Bash(ls -la /c/xampp/htdocs/mantoy/actions/calendar*)"
     ]
   }
 }

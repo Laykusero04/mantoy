@@ -65,23 +65,26 @@ switch ($action) {
             redirect($redirectUrl);
         }
 
-        if (!isset($_FILES['file']) || $_FILES['file']['error'] !== UPLOAD_ERR_OK) {
+        // Collect files from either multi (files[]) or single (file) input
+        $uploadedFiles = [];
+        if (!empty($_FILES['files']['name'][0])) {
+            $fileCount = count($_FILES['files']['name']);
+            for ($i = 0; $i < $fileCount; $i++) {
+                if ($_FILES['files']['error'][$i] === UPLOAD_ERR_OK) {
+                    $uploadedFiles[] = [
+                        'name'     => $_FILES['files']['name'][$i],
+                        'tmp_name' => $_FILES['files']['tmp_name'][$i],
+                        'size'     => $_FILES['files']['size'][$i],
+                        'type'     => $_FILES['files']['type'][$i],
+                    ];
+                }
+            }
+        } elseif (isset($_FILES['file']) && $_FILES['file']['error'] === UPLOAD_ERR_OK) {
+            $uploadedFiles[] = $_FILES['file'];
+        }
+
+        if (empty($uploadedFiles)) {
             flashMessage('danger', 'No file selected or upload error.');
-            redirect($redirectUrl);
-        }
-
-        $file = $_FILES['file'];
-
-        // Validate size
-        if ($file['size'] > MAX_FILE_SIZE) {
-            flashMessage('danger', 'File exceeds maximum size of 10MB.');
-            redirect($redirectUrl);
-        }
-
-        // Validate extension
-        $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-        if (!in_array($ext, ALLOWED_EXTENSIONS)) {
-            flashMessage('danger', 'File type not allowed. Allowed: ' . implode(', ', ALLOWED_EXTENSIONS));
             redirect($redirectUrl);
         }
 
@@ -92,31 +95,51 @@ switch ($action) {
             mkdir($workflowDir, 0755, true);
         }
 
-        // Generate unique filename
-        $storedName = time() . '_' . preg_replace('/[^a-zA-Z0-9._-]/', '_', $file['name']);
-        $destPath   = $workflowDir . $storedName;
+        $successCount = 0;
+        $errors = [];
+        $description = trim($_POST['description'] ?? '');
 
-        if (!move_uploaded_file($file['tmp_name'], $destPath)) {
-            flashMessage('danger', 'Failed to save file.');
-            redirect($redirectUrl);
+        foreach ($uploadedFiles as $file) {
+            // Validate size + extension
+            $uploadError = validateUpload($file['name'], $file['size']);
+            if ($uploadError) {
+                $errors[] = $uploadError;
+                continue;
+            }
+
+            // Generate unique filename
+            $storedName = generateSafeFilename($file['name']);
+            $destPath   = $workflowDir . $storedName;
+
+            if (!move_uploaded_file($file['tmp_name'], $destPath)) {
+                $errors[] = $file['name'] . ': failed to save.';
+                continue;
+            }
+
+            // Save metadata
+            $stmt = $pdo->prepare("
+                INSERT INTO workflow_attachments (stage_id, project_id, file_name, file_original_name, file_type, file_size, description)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            ");
+            $stmt->execute([
+                $stageId,
+                $projectId,
+                $storedName,
+                $file['name'],
+                $file['type'],
+                $file['size'],
+                $description,
+            ]);
+            $successCount++;
         }
 
-        // Save metadata
-        $stmt = $pdo->prepare("
-            INSERT INTO workflow_attachments (stage_id, project_id, file_name, file_original_name, file_type, file_size, description)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        ");
-        $stmt->execute([
-            $stageId,
-            $projectId,
-            $storedName,
-            $file['name'],
-            $file['type'],
-            $file['size'],
-            trim($_POST['description'] ?? ''),
-        ]);
-
-        flashMessage('success', 'File uploaded to workflow stage.');
+        if ($successCount > 0 && empty($errors)) {
+            flashMessage('success', $successCount . ' file(s) uploaded to workflow stage.');
+        } elseif ($successCount > 0) {
+            flashMessage('warning', $successCount . ' file(s) uploaded. Errors: ' . implode(' ', $errors));
+        } else {
+            flashMessage('danger', 'Upload failed. ' . implode(' ', $errors));
+        }
         redirect($redirectUrl);
         break;
 

@@ -15,30 +15,45 @@ if ($projectId <= 0) {
     redirect(BASE_URL . '/pages/projects/list.php');
 }
 
-$redirectUrl = BASE_URL . '/pages/projects/view.php?id=' . $projectId . '&tab=files';
+$redirectUrl = $_POST['redirect_url'] ?? BASE_URL . '/pages/projects/view.php?id=' . $projectId . '&tab=files';
 
 switch ($action) {
 
     case 'upload':
-        if (!isset($_FILES['file']) || $_FILES['file']['error'] !== UPLOAD_ERR_OK) {
+        // Collect files from either multi (files[]) or single (file) input
+        $uploadedFiles = [];
+        $descriptions  = [];
+
+        if (!empty($_FILES['files']['name'][0])) {
+            $fileCount = count($_FILES['files']['name']);
+            for ($i = 0; $i < $fileCount; $i++) {
+                if ($_FILES['files']['error'][$i] === UPLOAD_ERR_OK) {
+                    $uploadedFiles[] = [
+                        'name'     => $_FILES['files']['name'][$i],
+                        'tmp_name' => $_FILES['files']['tmp_name'][$i],
+                        'size'     => $_FILES['files']['size'][$i],
+                        'type'     => $_FILES['files']['type'][$i],
+                    ];
+                    $descriptions[] = trim($_POST['descriptions'][$i] ?? $_POST['description'] ?? '');
+                }
+            }
+        } elseif (isset($_FILES['file']) && $_FILES['file']['error'] === UPLOAD_ERR_OK) {
+            $uploadedFiles[] = [
+                'name'     => $_FILES['file']['name'],
+                'tmp_name' => $_FILES['file']['tmp_name'],
+                'size'     => $_FILES['file']['size'],
+                'type'     => $_FILES['file']['type'],
+            ];
+            $descriptions[] = trim($_POST['description'] ?? '');
+        }
+
+        if (empty($uploadedFiles)) {
             flashMessage('danger', 'No file selected or upload error.');
             redirect($redirectUrl);
         }
 
-        $file = $_FILES['file'];
-
-        // Validate size
-        if ($file['size'] > MAX_FILE_SIZE) {
-            flashMessage('danger', 'File exceeds maximum size of 10MB.');
-            redirect($redirectUrl);
-        }
-
-        // Validate extension
-        $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-        if (!in_array($ext, ALLOWED_EXTENSIONS)) {
-            flashMessage('danger', 'File type not allowed. Allowed: ' . implode(', ', ALLOWED_EXTENSIONS));
-            redirect($redirectUrl);
-        }
+        $moduleType     = $_POST['module_type'] ?? 'general';
+        $moduleRecordId = !empty($_POST['module_record_id']) ? (int)$_POST['module_record_id'] : null;
 
         // Create project upload directory
         $projectDir = UPLOAD_DIR . $projectId . '/';
@@ -46,30 +61,52 @@ switch ($action) {
             mkdir($projectDir, 0755, true);
         }
 
-        // Generate unique filename
-        $storedName = time() . '_' . preg_replace('/[^a-zA-Z0-9._-]/', '_', $file['name']);
-        $destPath   = $projectDir . $storedName;
+        $successCount = 0;
+        $errors = [];
 
-        if (!move_uploaded_file($file['tmp_name'], $destPath)) {
-            flashMessage('danger', 'Failed to save file.');
-            redirect($redirectUrl);
+        foreach ($uploadedFiles as $idx => $file) {
+            // Validate size + extension
+            $uploadError = validateUpload($file['name'], $file['size']);
+            if ($uploadError) {
+                $errors[] = $uploadError;
+                continue;
+            }
+
+            // Generate unique filename
+            $storedName = generateSafeFilename($file['name']);
+            $destPath   = $projectDir . $storedName;
+
+            if (!move_uploaded_file($file['tmp_name'], $destPath)) {
+                $errors[] = $file['name'] . ': failed to save.';
+                continue;
+            }
+
+            // Save metadata (requires migration_v2.sql applied)
+            $stmt = $pdo->prepare("
+                INSERT INTO attachments (project_id, module_type, module_record_id, file_name, file_original_name, file_type, file_size, description)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ");
+            $stmt->execute([
+                $projectId,
+                $moduleType,
+                $moduleRecordId,
+                $storedName,
+                $file['name'],
+                $file['type'],
+                $file['size'],
+                $descriptions[$idx] ?? '',
+            ]);
+
+            $successCount++;
         }
 
-        // Save metadata
-        $stmt = $pdo->prepare("
-            INSERT INTO attachments (project_id, file_name, file_original_name, file_type, file_size, description)
-            VALUES (?, ?, ?, ?, ?, ?)
-        ");
-        $stmt->execute([
-            $projectId,
-            $storedName,
-            $file['name'],
-            $file['type'],
-            $file['size'],
-            trim($_POST['description'] ?? ''),
-        ]);
-
-        flashMessage('success', 'File uploaded.');
+        if ($successCount > 0 && empty($errors)) {
+            flashMessage('success', $successCount . ' file(s) uploaded.');
+        } elseif ($successCount > 0) {
+            flashMessage('warning', $successCount . ' file(s) uploaded. Errors: ' . implode(' ', $errors));
+        } else {
+            flashMessage('danger', 'Upload failed. ' . implode(' ', $errors));
+        }
         redirect($redirectUrl);
         break;
 
