@@ -9,11 +9,16 @@ $estimatedTotal = array_sum(array_column($budgetItems, 'total_cost'));
 ?>
 
 <div class="card shadow-sm">
-    <div class="card-header bg-white d-flex justify-content-between align-items-center">
-        <h6 class="mb-0 section-title">Budget Breakdown</h6>
-        <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addBudgetModal">
-            <i class="bi bi-plus-lg me-1"></i> Add Item
-        </button>
+    <div class="card-header bg-white d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <h6 class="mb-0 section-title">Scope of Work</h6>
+        <div class="d-flex gap-2">
+            <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#editBudgetSowModal">
+                <i class="bi bi-wallet2 me-1"></i> Edit Budget
+            </button>
+            <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addBudgetModal">
+                <i class="bi bi-plus-lg me-1"></i> Add Item
+            </button>
+        </div>
     </div>
     <div class="card-body p-0">
         <?php if (empty($budgetItems)): ?>
@@ -27,12 +32,12 @@ $estimatedTotal = array_sum(array_column($budgetItems, 'total_cost'));
                 <thead>
                     <tr>
                         <th style="width:5%">#</th>
-                        <th>Item Name</th>
-                        <th>Category</th>
+                        <th>Description</th>
                         <th class="text-end">Qty</th>
                         <th>Unit</th>
                         <th class="text-end">Unit Cost</th>
                         <th class="text-end">Total</th>
+                        <th class="text-center" style="width:8%">Planned duration (days)</th>
                         <th style="width:10%"></th>
                     </tr>
                 </thead>
@@ -41,21 +46,21 @@ $estimatedTotal = array_sum(array_column($budgetItems, 'total_cost'));
                     <tr>
                         <td class="text-muted"><?= $i + 1 ?></td>
                         <td class="fw-medium"><?= sanitize($item['item_name']) ?></td>
-                        <td><span class="badge bg-secondary"><?= sanitize($item['budget_category']) ?></span></td>
                         <td class="text-end"><?= number_format($item['quantity'], 2) ?></td>
-                        <td><?= sanitize($item['unit']) ?></td>
+                        <td><?= sanitize(($item['unit'] ?? '') ?: 'pcs') ?></td>
                         <td class="text-end"><?= formatCurrency($item['unit_cost']) ?></td>
                         <td class="text-end fw-bold"><?= formatCurrency($item['total_cost']) ?></td>
+                        <td class="text-center"><?= isset($item['duration_days']) && $item['duration_days'] !== null && $item['duration_days'] !== '' ? (int)$item['duration_days'] : '—' ?></td>
                         <td>
                             <div class="btn-group btn-group-sm">
                                 <button type="button" class="btn btn-outline-secondary btn-edit-budget"
                                         data-bs-toggle="modal" data-bs-target="#editBudgetModal"
                                         data-id="<?= $item['id'] ?>"
                                         data-name="<?= sanitize($item['item_name']) ?>"
-                                        data-category="<?= sanitize($item['budget_category']) ?>"
                                         data-quantity="<?= $item['quantity'] ?>"
-                                        data-unit="<?= sanitize($item['unit']) ?>"
-                                        data-cost="<?= $item['unit_cost'] ?>">
+                                        data-unit="<?= sanitize(($item['unit'] ?? '') ?: 'pcs') ?>"
+                                        data-cost="<?= $item['unit_cost'] ?>"
+                                        data-duration-days="<?= isset($item['duration_days']) && $item['duration_days'] !== null && $item['duration_days'] !== '' ? (int)$item['duration_days'] : '' ?>">
                                     <i class="bi bi-pencil"></i>
                                 </button>
                                 <form action="<?= BASE_URL ?>/actions/budget_actions.php" method="POST" class="d-inline"
@@ -72,8 +77,9 @@ $estimatedTotal = array_sum(array_column($budgetItems, 'total_cost'));
                 </tbody>
                 <tfoot>
                     <tr class="table-light">
-                        <td colspan="6" class="text-end fw-bold">TOTAL:</td>
+                        <td colspan="5" class="text-end fw-bold">TOTAL:</td>
                         <td class="text-end fw-bold"><?= formatCurrency($estimatedTotal) ?></td>
+                        <td></td>
                         <td></td>
                     </tr>
                 </tfoot>
@@ -117,6 +123,43 @@ $estimatedTotal = array_sum(array_column($budgetItems, 'total_cost'));
     </div>
 </div>
 
+<!-- Edit Budget Modal (Scope of Work tab) -->
+<div class="modal fade" id="editBudgetSowModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content">
+            <form action="<?= BASE_URL ?>/actions/project_actions.php" method="POST">
+                <input type="hidden" name="action" value="update_budget">
+                <input type="hidden" name="project_id" value="<?= $id ?>">
+                <input type="hidden" name="redirect_url" value="<?= BASE_URL ?>/pages/projects/view.php?id=<?= $id ?>&tab=budget">
+                <div class="modal-header">
+                    <h6 class="modal-title">Edit Budget</h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Budget Allocated</label>
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text">&#8369;</span>
+                            <input type="number" class="form-control" name="budget_allocated" step="0.01" min="0" value="<?= (float)($project['budget_allocated'] ?? 0) ?>">
+                        </div>
+                    </div>
+                    <div class="mb-0">
+                        <label class="form-label">Actual Cost</label>
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text">&#8369;</span>
+                            <input type="number" class="form-control" name="actual_cost" step="0.01" min="0" value="<?= (float)($project['actual_cost'] ?? 0) ?>">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary btn-sm">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <!-- Add Budget Modal -->
 <div class="modal fade" id="addBudgetModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
@@ -130,23 +173,15 @@ $estimatedTotal = array_sum(array_column($budgetItems, 'total_cost'));
                 </div>
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label class="form-label">Item Name <span class="text-danger">*</span></label>
+                        <label class="form-label">Description <span class="text-danger">*</span></label>
                         <input type="text" class="form-control" name="item_name" required>
                     </div>
                     <div class="row g-3">
                         <div class="col-md-6">
-                            <label class="form-label">Category</label>
-                            <select class="form-select" name="budget_category">
-                                <option value="MOOE">MOOE</option>
-                                <option value="Capital Outlay">Capital Outlay</option>
-                                <option value="Personnel Services">Personnel Services</option>
-                            </select>
-                        </div>
-                        <div class="col-md-3">
                             <label class="form-label">Quantity</label>
                             <input type="number" class="form-control" name="quantity" step="0.01" min="0" value="1">
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-6">
                             <label class="form-label">Unit</label>
                             <input type="text" class="form-control" name="unit" value="pcs">
                         </div>
@@ -157,6 +192,10 @@ $estimatedTotal = array_sum(array_column($budgetItems, 'total_cost'));
                             <span class="input-group-text">&#8369;</span>
                             <input type="number" class="form-control" name="unit_cost" step="0.01" min="0" value="0.00">
                         </div>
+                    </div>
+                    <div class="mt-3">
+                        <label class="form-label">Planned duration (days)</label>
+                        <input type="number" class="form-control" name="duration_days" min="0" max="365" placeholder="Optional" value="">
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -182,23 +221,15 @@ $estimatedTotal = array_sum(array_column($budgetItems, 'total_cost'));
                 </div>
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label class="form-label">Item Name <span class="text-danger">*</span></label>
+                        <label class="form-label">Description <span class="text-danger">*</span></label>
                         <input type="text" class="form-control" name="item_name" id="editBudgetName" required>
                     </div>
                     <div class="row g-3">
                         <div class="col-md-6">
-                            <label class="form-label">Category</label>
-                            <select class="form-select" name="budget_category" id="editBudgetCategory">
-                                <option value="MOOE">MOOE</option>
-                                <option value="Capital Outlay">Capital Outlay</option>
-                                <option value="Personnel Services">Personnel Services</option>
-                            </select>
-                        </div>
-                        <div class="col-md-3">
                             <label class="form-label">Quantity</label>
                             <input type="number" class="form-control" name="quantity" id="editBudgetQty" step="0.01" min="0">
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-6">
                             <label class="form-label">Unit</label>
                             <input type="text" class="form-control" name="unit" id="editBudgetUnit">
                         </div>
@@ -210,6 +241,10 @@ $estimatedTotal = array_sum(array_column($budgetItems, 'total_cost'));
                             <input type="number" class="form-control" name="unit_cost" id="editBudgetCost" step="0.01" min="0">
                         </div>
                     </div>
+                    <div class="mt-3">
+                        <label class="form-label">Planned duration (days)</label>
+                        <input type="number" class="form-control" name="duration_days" id="editBudgetDuration" min="0" max="365" placeholder="Optional">
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
@@ -219,3 +254,27 @@ $estimatedTotal = array_sum(array_column($budgetItems, 'total_cost'));
         </div>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var editBtns = document.querySelectorAll('.btn-edit-budget');
+    var modal = document.getElementById('editBudgetModal');
+    if (!modal) return;
+    editBtns.forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            document.getElementById('editBudgetId').value = btn.getAttribute('data-id') || '';
+            document.getElementById('editBudgetName').value = btn.getAttribute('data-name') || '';
+            document.getElementById('editBudgetQty').value = btn.getAttribute('data-quantity') || '';
+            document.getElementById('editBudgetUnit').value = btn.getAttribute('data-unit') || '';
+            document.getElementById('editBudgetCost').value = btn.getAttribute('data-cost') || '';
+            var dur = btn.getAttribute('data-duration-days');
+            document.getElementById('editBudgetDuration').value = (dur !== null && dur !== '' && dur !== undefined) ? dur : '';
+        });
+    });
+});
+</script>
+
+<?php
+// Planning / Design: timeline, breakdown, Gantt — same content as Planning tab, under Scope of Work
+$planningEmbeddedInScopeOfWork = true;
+require __DIR__ . '/planning.php';

@@ -20,27 +20,6 @@ if (!$project) {
 
 // Fetch categories
 $categories = $pdo->query("SELECT id, name FROM categories ORDER BY name")->fetchAll();
-
-// Fetch workflow stages
-$wfStmt = $pdo->prepare("SELECT * FROM workflow_stages WHERE project_id = ? ORDER BY stage_order");
-$wfStmt->execute([$id]);
-$workflowStages = $wfStmt->fetchAll();
-
-// If no stages exist (legacy project), create them
-if (empty($workflowStages)) {
-    initWorkflowStages($pdo, $id);
-    $wfStmt->execute([$id]);
-    $workflowStages = $wfStmt->fetchAll();
-}
-
-// Fetch workflow attachments grouped by stage
-$wfAttStmt = $pdo->prepare("SELECT * FROM workflow_attachments WHERE project_id = ? ORDER BY uploaded_at DESC");
-$wfAttStmt->execute([$id]);
-$allWfAttachments = $wfAttStmt->fetchAll();
-$wfAttByStage = [];
-foreach ($allWfAttachments as $att) {
-    $wfAttByStage[$att['stage_id']][] = $att;
-}
 ?>
 
 <div class="d-flex justify-content-between align-items-center mb-4">
@@ -136,6 +115,14 @@ foreach ($allWfAttachments as $att) {
                         <?php endforeach; ?>
                     </select>
                 </div>
+                <div class="col-md-6">
+                    <label for="location" class="form-label">Location</label>
+                    <input type="text" class="form-control" id="location" name="location" value="<?= sanitize($project['location'] ?? '') ?>" placeholder="e.g. Barangay, City, or address">
+                </div>
+                <div class="col-md-6">
+                    <label for="contact_person" class="form-label">Contact Person</label>
+                    <input type="text" class="form-control" id="contact_person" name="contact_person" value="<?= sanitize($project['contact_person'] ?? '') ?>">
+                </div>
                 <div class="col-12">
                     <label for="description" class="form-label">Description</label>
                     <textarea class="form-control" id="description" name="description" rows="3"><?= sanitize($project['description']) ?></textarea>
@@ -143,6 +130,66 @@ foreach ($allWfAttachments as $att) {
             </div>
         </div>
     </div>
+
+    <!-- Budget -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-white">
+            <h6 class="mb-0 section-title"><i class="bi bi-wallet2 me-1"></i> Budget</h6>
+        </div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label for="budget_allocated" class="form-label">Budget Allocated</label>
+                    <div class="input-group">
+                        <span class="input-group-text">&#8369;</span>
+                        <input type="number" class="form-control" id="budget_allocated" name="budget_allocated"
+                               step="0.01" min="0" value="<?= (float)($project['budget_allocated'] ?? 0) ?>">
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <label for="actual_cost" class="form-label">Actual Cost</label>
+                    <div class="input-group">
+                        <span class="input-group-text">&#8369;</span>
+                        <input type="number" class="form-control" id="actual_cost" name="actual_cost"
+                               step="0.01" min="0" value="<?= (float)($project['actual_cost'] ?? 0) ?>">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Working days (weekends): some projects work Sat/Sun -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-white" id="working-days">
+            <h6 class="mb-0 section-title">Working days (weekends)</h6>
+        </div>
+        <div class="card-body">
+            <div class="mb-3">
+                <label for="notice_to_proceed" class="form-label">Notice to Proceed (NTP)</label>
+                <input type="date" class="form-control" id="notice_to_proceed" name="notice_to_proceed" value="<?= !empty($project['notice_to_proceed']) ? sanitize($project['notice_to_proceed']) : '' ?>">
+                <div class="form-text">Official project start date; used for timeline and planning baseline.</div>
+            </div>
+            <p class="text-muted small mb-2">By default Saturday and Sunday are no-work. Check if this project works on:</p>
+            <div class="d-flex gap-4">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="saturday_working" id="saturday_working" value="1" <?= !empty($project['saturday_working']) ? 'checked' : '' ?>>
+                    <label class="form-check-label" for="saturday_working">Saturday is working day</label>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="sunday_working" id="sunday_working" value="1" <?= !empty($project['sunday_working']) ? 'checked' : '' ?>>
+                    <label class="form-check-label" for="sunday_working">Sunday is working day</label>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <?php
+    // Preserve fields not shown in this form so update doesn't clear them
+    foreach (['funding_source', 'resolution_no', 'start_date', 'target_end_date', 'actual_end_date', 'fiscal_year', 'remarks'] as $f):
+        $v = $project[$f] ?? '';
+        ?>
+        <input type="hidden" name="<?= $f ?>" value="<?= sanitize((string)$v) ?>">
+    <?php endforeach; ?>
 
     <!-- Form Actions -->
     <div class="d-flex justify-content-end gap-2 mb-4">
@@ -152,161 +199,6 @@ foreach ($allWfAttachments as $att) {
         </button>
     </div>
 </form>
-
-<!-- ═══════════════════════════════════════════════════════════
-     WORKFLOW DOCUMENTATION
-     ═══════════════════════════════════════════════════════════ -->
-<div class="mb-4">
-    <h5 class="fw-bold mb-3"><i class="bi bi-diagram-3 me-2"></i>Workflow Documentation</h5>
-    <p class="text-muted small">Upload required documents for each workflow stage. Each stage tracks the project's progress through the communication pipeline.</p>
-
-    <?php foreach ($workflowStages as $stage):
-        $stageAtts = $wfAttByStage[$stage['id']] ?? [];
-        $isStatusStage = ($stage['stage_type'] === 'Status');
-        $statusClass = match($stage['status']) {
-            'Completed' => 'border-success',
-            'In Progress' => 'border-info',
-            default => 'border-secondary',
-        };
-        $stepIcon = match($stage['status']) {
-            'Completed' => '<i class="bi bi-check-circle-fill text-success"></i>',
-            'In Progress' => '<i class="bi bi-circle-fill text-info"></i>',
-            default => '<i class="bi bi-circle text-secondary"></i>',
-        };
-    ?>
-    <div class="card shadow-sm mb-3 border-start border-4 <?= $statusClass ?>">
-        <div class="card-header bg-white d-flex justify-content-between align-items-center">
-            <div class="d-flex align-items-center gap-2">
-                <?= $stepIcon ?>
-                <h6 class="mb-0">Step <?= $stage['stage_order'] ?>: <?= sanitize($stage['stage_type']) ?></h6>
-            </div>
-            <span class="badge bg-<?= match($stage['status']) { 'Completed' => 'success', 'In Progress' => 'info', default => 'secondary' } ?>">
-                <?= sanitize($stage['status']) ?>
-            </span>
-        </div>
-        <div class="card-body">
-            <!-- Update Stage Status & Notes -->
-            <form action="<?= BASE_URL ?>/actions/workflow_actions.php" method="POST" class="mb-3">
-                <input type="hidden" name="action" value="update_stage">
-                <input type="hidden" name="project_id" value="<?= $id ?>">
-                <input type="hidden" name="stage_id" value="<?= $stage['id'] ?>">
-                <input type="hidden" name="redirect_to" value="<?= BASE_URL ?>/pages/projects/edit.php?id=<?= $id ?>">
-                <div class="row g-3">
-                    <div class="col-md-3">
-                        <label class="form-label small">Status</label>
-                        <select name="stage_status" class="form-select form-select-sm">
-                            <?php foreach (['Pending', 'In Progress', 'Completed'] as $ss): ?>
-                                <option value="<?= $ss ?>" <?= $stage['status'] === $ss ? 'selected' : '' ?>><?= $ss ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div class="col-md-7">
-                        <label class="form-label small">Notes</label>
-                        <textarea name="notes" class="form-control form-control-sm" rows="2"><?= sanitize($stage['notes'] ?? '') ?></textarea>
-                    </div>
-                    <div class="col-md-2 d-flex align-items-end">
-                        <button type="submit" class="btn btn-primary btn-sm w-100">
-                            <i class="bi bi-check-lg me-1"></i> Save
-                        </button>
-                    </div>
-                </div>
-                <?php if ($stage['completed_at']): ?>
-                    <small class="text-muted mt-1 d-block">Completed: <?= formatDate($stage['completed_at']) ?></small>
-                <?php endif; ?>
-            </form>
-
-            <?php if (!$isStatusStage): ?>
-            <!-- File Upload & List -->
-            <hr class="my-3">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-                <h6 class="mb-0 small fw-bold text-muted">
-                    <i class="bi bi-paperclip me-1"></i> Attachments (<?= count($stageAtts) ?>)
-                </h6>
-                <button type="button" class="btn btn-outline-primary btn-sm btn-wf-upload"
-                        data-stage-id="<?= $stage['id'] ?>" data-stage-name="<?= sanitize($stage['stage_type']) ?>">
-                    <i class="bi bi-upload me-1"></i> Upload
-                </button>
-            </div>
-
-            <?php if (!empty($stageAtts)): ?>
-            <div class="table-responsive">
-                <table class="table table-sm table-hover mb-0">
-                    <thead><tr><th>File</th><th>Size</th><th>Uploaded</th><th></th></tr></thead>
-                    <tbody>
-                    <?php foreach ($stageAtts as $att):
-                        $slug = stageSlug($stage['stage_type']);
-                        $fileUrl = BASE_URL . '/uploads/' . $id . '/workflow/' . $slug . '/' . $att['file_name'];
-                    ?>
-                        <tr>
-                            <td>
-                                <a href="<?= $fileUrl ?>" target="_blank" class="text-decoration-none">
-                                    <i class="bi bi-file-earmark me-1"></i><?= sanitize($att['file_original_name']) ?>
-                                </a>
-                                <?php if ($att['description']): ?>
-                                    <span class="text-muted small ms-1">&mdash; <?= sanitize($att['description']) ?></span>
-                                <?php endif; ?>
-                            </td>
-                            <td class="small text-muted"><?= number_format($att['file_size'] / 1024, 1) ?> KB</td>
-                            <td class="small text-muted"><?= formatDate($att['uploaded_at']) ?></td>
-                            <td>
-                                <form action="<?= BASE_URL ?>/actions/workflow_actions.php" method="POST" class="d-inline"
-                                      onsubmit="return confirm('Delete this file?')">
-                                    <input type="hidden" name="action" value="delete_file">
-                                    <input type="hidden" name="project_id" value="<?= $id ?>">
-                                    <input type="hidden" name="file_id" value="<?= $att['id'] ?>">
-                                    <input type="hidden" name="redirect_to" value="<?= BASE_URL ?>/pages/projects/edit.php?id=<?= $id ?>">
-                                    <button type="submit" class="btn btn-outline-danger btn-sm py-0 px-1">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
-                                </form>
-                            </td>
-                        </tr>
-                    <?php endforeach; ?>
-                    </tbody>
-                </table>
-            </div>
-            <?php else: ?>
-                <p class="text-muted small mb-0">No files attached yet.</p>
-            <?php endif; ?>
-            <?php endif; ?>
-        </div>
-    </div>
-    <?php endforeach; ?>
-</div>
-
-<!-- Workflow File Upload Modal -->
-<div class="modal fade" id="wfEditUploadModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <form action="<?= BASE_URL ?>/actions/workflow_actions.php" method="POST" enctype="multipart/form-data">
-                <input type="hidden" name="action" value="upload_file">
-                <input type="hidden" name="project_id" value="<?= $id ?>">
-                <input type="hidden" name="stage_id" id="wfEditUploadStageId" value="">
-                <input type="hidden" name="redirect_to" value="<?= BASE_URL ?>/pages/projects/edit.php?id=<?= $id ?>">
-                <div class="modal-header">
-                    <h6 class="modal-title">Upload File — <span id="wfEditUploadStageName"></span></h6>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="mb-3">
-                        <label class="form-label">Files <span class="text-danger">*</span></label>
-                        <input type="file" name="files[]" class="form-control" multiple required
-                               accept=".<?= implode(',.', ALLOWED_EXTENSIONS) ?>">
-                        <div class="form-text">Max 50MB per file. Select multiple files. Allowed: <?= strtoupper(implode(', ', ALLOWED_EXTENSIONS)) ?></div>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Description</label>
-                        <input type="text" name="description" class="form-control" placeholder="Optional description">
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary btn-sm">Upload</button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
 
 <?php
 $pageScripts = '<script>
@@ -359,15 +251,6 @@ document.querySelectorAll("input[name=visibility]").forEach(function(r) {
 document.getElementById("department").addEventListener("change", function() {
     document.getElementById("project_subtype").value = "";
     updateSubtypes();
-});
-
-// Workflow upload modal
-document.querySelectorAll(".btn-wf-upload").forEach(function(btn) {
-    btn.addEventListener("click", function() {
-        document.getElementById("wfEditUploadStageId").value = this.dataset.stageId;
-        document.getElementById("wfEditUploadStageName").textContent = this.dataset.stageName;
-        new bootstrap.Modal(document.getElementById("wfEditUploadModal")).show();
-    });
 });
 </script>';
 

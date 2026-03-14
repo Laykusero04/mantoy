@@ -120,11 +120,11 @@ if (in_array('budget', $sections)) {
 
     if (!empty($budgetItems)) {
         $section->addTextBreak();
-        $section->addText('Budget Breakdown', ['bold' => true, 'size' => 11, 'color' => '1a56db']);
+        $section->addText('Scope of Work', ['bold' => true, 'size' => 11, 'color' => '1a56db']);
 
         $table = $section->addTable('projectTable');
         $headerRow = $table->addRow();
-        foreach (['#', 'Item', 'Category', 'Qty', 'Unit', 'Unit Cost', 'Total'] as $h) {
+        foreach (['#', 'Item', 'Qty', 'Unit', 'Unit Cost', 'Total'] as $h) {
             $headerRow->addCell($h === 'Item' ? 3000 : 1200, ['bgColor' => '1a56db'])->addText($h, $tableHeaderFont);
         }
 
@@ -133,7 +133,6 @@ if (in_array('budget', $sections)) {
             $row = $table->addRow();
             $row->addCell(1200)->addText($i + 1, $tableCellFont);
             $row->addCell(3000)->addText($item['item_name'], $tableCellFont);
-            $row->addCell(1200)->addText($item['budget_category'], $tableCellFont);
             $row->addCell(1200)->addText(number_format($item['quantity'], 2), $tableCellFont);
             $row->addCell(1200)->addText($item['unit'], $tableCellFont);
             $row->addCell(1200)->addText(formatCurrency($item['unit_cost']), $tableCellFont);
@@ -141,7 +140,7 @@ if (in_array('budget', $sections)) {
             $total += $item['total_cost'];
         }
         $totalRow = $table->addRow();
-        $totalRow->addCell(8400, ['gridSpan' => 6])->addText('TOTAL:', ['bold' => true, 'size' => 8]);
+        $totalRow->addCell(7200, ['gridSpan' => 5])->addText('TOTAL:', ['bold' => true, 'size' => 8]);
         $totalRow->addCell(1200)->addText(formatCurrency($total), ['bold' => true, 'size' => 8]);
     }
 }

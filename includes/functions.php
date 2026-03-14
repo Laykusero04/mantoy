@@ -83,6 +83,76 @@ function getFlashMessage() {
 }
 
 /**
+ * Recalculate project actual_cost from SUM(calendar_events.daily_cost) for the given project.
+ * Call after create/update/delete of calendar events for that project.
+ *
+ * @param PDO $pdo
+ * @param int $projectId
+ */
+function recalcProjectActualCost($pdo, $projectId) {
+    $projectId = (int) $projectId;
+    if ($projectId <= 0) return;
+    $stmt = $pdo->prepare("SELECT COALESCE(SUM(daily_cost), 0) FROM calendar_events WHERE project_id = ?");
+    $stmt->execute([$projectId]);
+    $total = (float) $stmt->fetchColumn();
+    $upd = $pdo->prepare("UPDATE projects SET actual_cost = ? WHERE id = ?");
+    $upd->execute([$total, $projectId]);
+}
+
+/**
+ * Write a simple activity entry into action_logs for a project.
+ * Encodes the originating module in the action_taken field.
+ *
+ * @param PDO         $pdo
+ * @param int         $projectId
+ * @param string      $module   Short module label, e.g. 'Inspection', 'Materials', 'Calendar'
+ * @param string      $message  What happened, e.g. 'Inspection approved'
+ * @param string|null $loggedBy Who did it (fallback 'System' when null)
+ * @param string|null $logDate  When it happened (Y-m-d H:i:s, fallback now() when null)
+ */
+function logProjectActivity($pdo, $projectId, $module, $message, $loggedBy = null, $logDate = null) {
+    $projectId = (int)$projectId;
+    if ($projectId <= 0) {
+        return;
+    }
+    $module = trim((string)$module);
+    $message = trim((string)$message);
+    if ($module === '' || $message === '') {
+        return;
+    }
+
+    $prefix = '[' . $module . '] ';
+    $actionTaken = mb_substr($prefix . $message, 0, 500);
+    $notes = null;
+    $who = $loggedBy !== null && trim($loggedBy) !== '' ? trim($loggedBy) : 'System';
+
+    if ($logDate === null || trim($logDate) === '') {
+        $logDate = date('Y-m-d H:i:s');
+    }
+
+    try {
+        $stmt = $pdo->prepare("
+            INSERT INTO action_logs (project_id, action_taken, notes, logged_by, log_date)
+            VALUES (?, ?, ?, ?, ?)
+        ");
+        $stmt->execute([
+            $projectId,
+            $actionTaken,
+            $notes,
+            $who,
+            $logDate,
+        ]);
+    } catch (Exception $e) {
+        appLog('error', 'Failed to write project activity log', [
+            'project_id' => $projectId,
+            'module'     => $module,
+            'message'    => $message,
+            'error'      => $e->getMessage(),
+        ]);
+    }
+}
+
+/**
  * Get classification label for display
  */
 function getClassificationLabel($project) {
@@ -101,6 +171,42 @@ function getClassificationBadgeClass($project) {
     if ($project['department'] === 'CEO') return 'bg-info';
     if ($project['department'] === 'Mayors') return 'bg-primary';
     return 'bg-secondary';
+}
+
+/**
+ * 27 Barangays of Koronadal City (for project location dropdown)
+ */
+function getKoronadalBarangays() {
+    return [
+        'Assumption',
+        'Avanceña',
+        'Buenaflor',
+        'Cacub',
+        'Caloocan',
+        'Carpenter Hill',
+        'Concepcion',
+        'Esperanza',
+        'General Paulino Santos',
+        'Mabini',
+        'Magsaysay',
+        'Maibo',
+        'Malandag',
+        'Marbel (Poblacion)',
+        'Morales',
+        'Namnama',
+        'New Pangasinan',
+        'Paraiso',
+        'Rotonda',
+        'San Isidro',
+        'San Jose',
+        'Saravia',
+        'Sta. Cruz',
+        'Tamban',
+        'Topland',
+        'Zone 1 (Poblacion)',
+        'Zone 2 (Poblacion)',
+        'Zone 3 (Poblacion)',
+    ];
 }
 
 /**
@@ -130,28 +236,36 @@ function getDepartmentSubtypes($pdo) {
 }
 
 /**
- * Get dashboard project counts for a fiscal year
+ * Get dashboard project counts for a fiscal year.
+ * @param PDO $pdo
+ * @param int $fiscalYear
+ * @param string|null $visibility 'Private', 'Public', or null for all
  */
-function getProjectCounts($pdo, $fiscalYear) {
+function getProjectCounts($pdo, $fiscalYear, $visibility = null) {
     $counts = [];
+    $visClause = $visibility !== null ? ' AND visibility = ?' : '';
+    $params = [$fiscalYear];
+    if ($visibility !== null) {
+        $params[] = $visibility;
+    }
 
     // Total projects (not deleted, not archived)
-    $stmt = $pdo->prepare("SELECT COUNT(*) FROM projects WHERE is_deleted = 0 AND is_archived = 0 AND fiscal_year = ?");
-    $stmt->execute([$fiscalYear]);
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM projects WHERE is_deleted = 0 AND is_archived = 0 AND fiscal_year = ?" . $visClause);
+    $stmt->execute($params);
     $counts['total'] = $stmt->fetchColumn();
 
     // By status
     $statuses = STATUS_OPTIONS;
     foreach ($statuses as $status) {
-        $stmt = $pdo->prepare("SELECT COUNT(*) FROM projects WHERE is_deleted = 0 AND is_archived = 0 AND fiscal_year = ? AND status = ?");
-        $stmt->execute([$fiscalYear, $status]);
+        $stmt = $pdo->prepare("SELECT COUNT(*) FROM projects WHERE is_deleted = 0 AND is_archived = 0 AND fiscal_year = ? AND status = ?" . $visClause);
+        $stmt->execute(array_merge([$fiscalYear, $status], $visibility !== null ? [$visibility] : []));
         $key = strtolower(str_replace(' ', '_', $status));
         $counts[$key] = $stmt->fetchColumn();
     }
 
     // Budget totals
-    $stmt = $pdo->prepare("SELECT COALESCE(SUM(budget_allocated), 0) as total_budget, COALESCE(SUM(actual_cost), 0) as total_actual FROM projects WHERE is_deleted = 0 AND is_archived = 0 AND fiscal_year = ?");
-    $stmt->execute([$fiscalYear]);
+    $stmt = $pdo->prepare("SELECT COALESCE(SUM(budget_allocated), 0) as total_budget, COALESCE(SUM(actual_cost), 0) as total_actual FROM projects WHERE is_deleted = 0 AND is_archived = 0 AND fiscal_year = ?" . $visClause);
+    $stmt->execute($params);
     $budget = $stmt->fetch();
     $counts['total_budget'] = $budget['total_budget'];
     $counts['total_actual'] = $budget['total_actual'];
@@ -162,8 +276,8 @@ function getProjectCounts($pdo, $fiscalYear) {
     // By department
     $departments = getDepartments($pdo);
     foreach ($departments as $dept) {
-        $stmt = $pdo->prepare("SELECT COUNT(*) as cnt, COALESCE(SUM(budget_allocated), 0) as budget FROM projects WHERE is_deleted = 0 AND is_archived = 0 AND fiscal_year = ? AND department = ?");
-        $stmt->execute([$fiscalYear, $dept]);
+        $stmt = $pdo->prepare("SELECT COUNT(*) as cnt, COALESCE(SUM(budget_allocated), 0) as budget FROM projects WHERE is_deleted = 0 AND is_archived = 0 AND fiscal_year = ? AND department = ?" . $visClause);
+        $stmt->execute(array_merge([$fiscalYear, $dept], $visibility !== null ? [$visibility] : []));
         $row = $stmt->fetch();
         $key = strtolower($dept);
         $counts[$key . '_count'] = $row['cnt'];
@@ -174,15 +288,15 @@ function getProjectCounts($pdo, $fiscalYear) {
     $allSubtypes = getDepartmentSubtypes($pdo);
     $subtypes = array_merge(...array_values($allSubtypes));
     foreach ($subtypes as $subtype) {
-        $stmt = $pdo->prepare("SELECT COUNT(*) as cnt, COALESCE(SUM(budget_allocated), 0) as budget FROM projects WHERE is_deleted = 0 AND is_archived = 0 AND fiscal_year = ? AND project_subtype = ?");
-        $stmt->execute([$fiscalYear, $subtype]);
+        $stmt = $pdo->prepare("SELECT COUNT(*) as cnt, COALESCE(SUM(budget_allocated), 0) as budget FROM projects WHERE is_deleted = 0 AND is_archived = 0 AND fiscal_year = ? AND project_subtype = ?" . $visClause);
+        $stmt->execute(array_merge([$fiscalYear, $subtype], $visibility !== null ? [$visibility] : []));
         $row = $stmt->fetch();
         $key = strtolower(str_replace(' ', '_', $subtype));
         $counts[$key . '_count'] = $row['cnt'];
         $counts[$key . '_budget'] = $row['budget'];
     }
 
-    // Private count
+    // Private count (when viewing all or private only)
     $stmt = $pdo->prepare("SELECT COUNT(*) as cnt, COALESCE(SUM(budget_allocated), 0) as budget FROM projects WHERE is_deleted = 0 AND is_archived = 0 AND fiscal_year = ? AND visibility = 'Private'");
     $stmt->execute([$fiscalYear]);
     $row = $stmt->fetch();
@@ -203,42 +317,6 @@ function isOverdue($project) {
         return false;
     }
     return strtotime($project['target_end_date']) < strtotime('today');
-}
-
-/**
- * Initialize workflow stages for a project
- */
-function initWorkflowStages($pdo, $projectId) {
-    $stages = [
-        ['Incoming Communication', 1],
-        ['Action Taken', 2],
-        ['Outgoing Communication', 3],
-        ['Status', 4],
-        ['Preparation of Plans/Estimates', 5],
-    ];
-    $stmt = $pdo->prepare("
-        INSERT IGNORE INTO workflow_stages (project_id, stage_type, stage_order)
-        VALUES (?, ?, ?)
-    ");
-    foreach ($stages as $s) {
-        $stmt->execute([$projectId, $s[0], $s[1]]);
-    }
-}
-
-/**
- * Get workflow completion percentage
- */
-function getWorkflowProgress($stages) {
-    $total = count($stages);
-    $completed = count(array_filter($stages, fn($s) => $s['status'] === 'Completed'));
-    return $total > 0 ? round(($completed / $total) * 100) : 0;
-}
-
-/**
- * Convert stage type to URL-safe slug
- */
-function stageSlug($stageType) {
-    return strtolower(preg_replace('/[^a-z0-9]+/i', '-', $stageType));
 }
 
 /**

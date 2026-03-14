@@ -86,20 +86,13 @@ $currentUrl = BASE_URL . '/pages/calendar/index.php';
                 </div>
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label class="form-label">Title <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" name="title" id="eventTitle" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Project (optional)</label>
-                        <select class="form-select" name="project_id" id="eventProject">
-                            <option value="">Global (no project)</option>
+                        <label class="form-label">Project <span class="text-danger">*</span></label>
+                        <select class="form-select" name="project_id" id="eventProject" required>
+                            <option value="">Select project...</option>
                             <?php foreach ($allProjects as $proj): ?>
                                 <option value="<?= (int)$proj['id'] ?>"><?= sanitize($proj['title']) ?></option>
                             <?php endforeach; ?>
                         </select>
-                        <div class="form-text small">
-                            Global events always appear on the main calendar.
-                        </div>
                     </div>
                     <div class="row g-2 mb-3">
                         <div class="col-md-6">
@@ -137,6 +130,19 @@ $currentUrl = BASE_URL . '/pages/calendar/index.php';
                         <textarea class="form-control" name="description" id="eventDescription" rows="3"></textarea>
                     </div>
                     <div class="mb-3">
+                        <label class="form-label">Daily cost (₱)</label>
+                        <input type="number" class="form-control" name="daily_cost" id="eventDailyCost" min="0" step="0.01" placeholder="0.00">
+                        <div class="form-text small">Cost for this day; project actual cost is the sum of all event daily costs.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Actual accomplishment</label>
+                        <textarea class="form-control" name="actual_accomplishment" id="eventActualAccomplishment" rows="2" placeholder="What was done on this day"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Remaining / unfinished work</label>
+                        <textarea class="form-control" name="remaining_work" id="eventRemainingWork" rows="2" placeholder="What is left to do"></textarea>
+                    </div>
+                    <div class="mb-3">
                         <div class="form-check">
                             <input class="form-check-input" type="checkbox" name="show_on_main" id="eventShowOnMain" checked>
                             <label class="form-check-label" for="eventShowOnMain">
@@ -158,6 +164,9 @@ $currentUrl = BASE_URL . '/pages/calendar/index.php';
                     </div>
                 </div>
                 <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-danger btn-sm me-auto" id="btnDeleteEvent" style="display: none;">
+                        <i class="bi bi-trash me-1"></i> Delete
+                    </button>
                     <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
                     <button type="submit" class="btn btn-primary btn-sm">Save</button>
                 </div>
@@ -189,7 +198,6 @@ document.addEventListener("DOMContentLoaded", function () {
     const eventAction = document.getElementById("eventAction");
     const eventId = document.getElementById("eventId");
     const eventModalTitle = document.getElementById("eventModalTitle");
-    const eventTitle = document.getElementById("eventTitle");
     const eventProject = document.getElementById("eventProject");
     const eventDate = document.getElementById("eventDate");
     const eventEndDate = document.getElementById("eventEndDate");
@@ -197,8 +205,20 @@ document.addEventListener("DOMContentLoaded", function () {
     const eventAllDay = document.getElementById("eventAllDay");
     const eventType = document.getElementById("eventType");
     const eventDescription = document.getElementById("eventDescription");
+    const eventDailyCost = document.getElementById("eventDailyCost");
+    const eventActualAccomplishment = document.getElementById("eventActualAccomplishment");
+    const eventRemainingWork = document.getElementById("eventRemainingWork");
     const eventShowOnMain = document.getElementById("eventShowOnMain");
     const deleteEventId = document.getElementById("deleteEventId");
+    const btnDeleteEvent = document.getElementById("btnDeleteEvent");
+
+    function formatLocalDate(d) {
+        if (!d) return "";
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, "0");
+        const day = String(d.getDate()).padStart(2, "0");
+        return y + "-" + m + "-" + day;
+    }
 
     function resetFormForCreate(dateStr) {
         eventForm.reset();
@@ -209,32 +229,39 @@ document.addEventListener("DOMContentLoaded", function () {
         eventEndDate.value = "";
         eventAllDay.checked = true;
         eventShowOnMain.checked = true;
+        eventDailyCost.value = "";
+        eventActualAccomplishment.value = "";
+        eventRemainingWork.value = "";
+        btnDeleteEvent.style.display = "none";
         // default project filter selection when creating from main calendar
         const selectedProject = projectFilter.value;
-        if (selectedProject && selectedProject !== "__global__") {
-            eventProject.value = selectedProject;
-        } else {
-            eventProject.value = "";
-        }
+        eventProject.value = (selectedProject && selectedProject !== "__global__") ? selectedProject : "";
     }
 
     function populateFormForEdit(event) {
         eventAction.value = "update";
         eventId.value = event.id;
         eventModalTitle.textContent = "Edit Event";
+        btnDeleteEvent.style.display = "inline-block";
 
         const props = event.extendedProps || {};
-        eventTitle.value = event.title || "";
         eventProject.value = props.project_id || "";
 
         const start = event.start;
         const end = event.end || start;
 
         if (start) {
-            eventDate.value = start.toISOString().slice(0, 10);
+            eventDate.value = formatLocalDate(start);
         }
         if (end) {
-            eventEndDate.value = end.toISOString().slice(0, 10);
+            // All-day events use exclusive end (next day); show last day in end date field
+            if (event.allDay && end) {
+                const lastDay = new Date(end);
+                lastDay.setDate(lastDay.getDate() - 1);
+                eventEndDate.value = formatLocalDate(lastDay);
+            } else {
+                eventEndDate.value = formatLocalDate(end);
+            }
         }
 
         if (event.allDay) {
@@ -242,11 +269,15 @@ document.addEventListener("DOMContentLoaded", function () {
             eventTime.value = "";
         } else if (start) {
             eventAllDay.checked = false;
-            eventTime.value = start.toTimeString().slice(0, 5);
+            const h = start.getHours(), m = start.getMinutes();
+            eventTime.value = String(h).padStart(2, "0") + ":" + String(m).padStart(2, "0");
         }
 
         eventType.value = props.event_type || "other";
         eventDescription.value = props.description || "";
+        eventDailyCost.value = (props.daily_cost != null && props.daily_cost !== "") ? props.daily_cost : "";
+        eventActualAccomplishment.value = props.actual_accomplishment || "";
+        eventRemainingWork.value = props.remaining_work || "";
         if (props.project_id) {
             eventShowOnMain.checked = props.show_on_main !== false;
         } else {
@@ -263,7 +294,7 @@ document.addEventListener("DOMContentLoaded", function () {
             center: "title",
             right: "dayGridMonth,timeGridWeek"
         },
-        firstDay: 1,
+        firstDay: 0,
         selectable: true,
         events: {
             url: "'. BASE_URL .'/pages/calendar/events.php",
@@ -315,10 +346,16 @@ document.addEventListener("DOMContentLoaded", function () {
         eventModal.show();
     });
 
-    // Delete support via long-press on Delete key when modal is open
+    btnDeleteEvent.addEventListener("click", function () {
+        if (!deleteEventId.value) return;
+        if (confirm("Delete this event? This cannot be undone.")) {
+            deleteEventForm.submit();
+        }
+    });
+
     eventModalEl.addEventListener("keydown", function (e) {
         if (e.key === "Delete" && deleteEventId.value) {
-            if (confirm("Delete this event?")) {
+            if (confirm("Delete this event? This cannot be undone.")) {
                 deleteEventForm.submit();
             }
         }

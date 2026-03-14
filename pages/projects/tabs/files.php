@@ -1,91 +1,148 @@
 <?php
 // Tab: Files — receives $pdo, $project, $id, $activeTab from view.php
 
-// Fetch files data
-$fileStmt = $pdo->prepare("SELECT * FROM attachments WHERE project_id = ? ORDER BY uploaded_at DESC");
+// Fetch files data (exclude pre-construction documents, which live in their own tab)
+$fileStmt = $pdo->prepare("
+    SELECT *
+    FROM attachments
+    WHERE project_id = ?
+      AND (module_type IS NULL OR module_type <> 'planning')
+    ORDER BY uploaded_at DESC
+");
 $fileStmt->execute([$id]);
 $attachments = $fileStmt->fetchAll();
 $totalFileSize = array_sum(array_column($attachments, 'file_size'));
 
+// Group all documents by upload date (encoded/upload date)
+$attachmentsByDate = [];
+foreach ($attachments as $a) {
+    $d = date('Y-m-d', strtotime($a['uploaded_at'] ?? 'now'));
+    if (!isset($attachmentsByDate[$d])) $attachmentsByDate[$d] = [];
+    $attachmentsByDate[$d][] = $a;
+}
+
+$imageAttachments = array_filter($attachments, function ($a) {
+    $ext = strtolower(pathinfo($a['file_original_name'], PATHINFO_EXTENSION));
+    return in_array($ext, ['jpg', 'jpeg', 'png', 'gif']);
+});
+$imageAttachments = array_values($imageAttachments);
 ?>
+
+<?php if (!empty($imageAttachments)): ?>
+<div class="card shadow-sm mb-3" id="pictureViewerCard" data-images="<?= htmlspecialchars(json_encode(array_map(function ($a) use ($id) {
+    $up = $a['uploaded_at'] ?? null;
+    $dateDisplay = $up ? (formatDate($up) . ' ' . date('g:i A', strtotime($up))) : '—';
+    return ['id' => (int)$a['id'], 'file_name' => $a['file_name'], 'file_original_name' => $a['file_original_name'], 'url' => BASE_URL . '/uploads/' . $id . '/' . $a['file_name'], 'date_display' => $dateDisplay];
+}, $imageAttachments)), ENT_QUOTES, 'UTF-8') ?>">
+    <div class="card-header bg-white">
+        <h6 class="mb-0 section-title">Pictures</h6>
+    </div>
+    <div class="card-body">
+        <div class="row align-items-center">
+            <div class="col-auto">
+                <button type="button" class="btn btn-outline-secondary btn-lg" id="btnPicPrev" title="Previous">
+                    <i class="bi bi-chevron-left"></i>
+                </button>
+            </div>
+            <div class="col text-center">
+                <div id="pictureViewerContainer" class="d-inline-block position-relative">
+                    <img id="pictureViewerImg" src="<?= BASE_URL ?>/uploads/<?= $id ?>/<?= sanitize($imageAttachments[0]['file_name']) ?>" alt="" class="img-fluid border rounded" style="max-height: 400px; object-fit: contain;">
+                    <?php
+                    $firstDate = !empty($imageAttachments[0]['uploaded_at']) ? (formatDate($imageAttachments[0]['uploaded_at']) . ' ' . date('g:i A', strtotime($imageAttachments[0]['uploaded_at']))) : '—';
+                ?>
+                    <div class="mt-2 small text-muted" id="pictureViewerCaption">1 of <?= count($imageAttachments) ?> — <?= sanitize($imageAttachments[0]['file_original_name']) ?> <span class="text-muted">· <?= $firstDate ?></span></div>
+                    <form action="<?= BASE_URL ?>/actions/attachment_actions.php" method="POST" class="mt-2 d-inline" id="pictureDeleteForm" onsubmit="return confirm('Delete this picture?');">
+                        <input type="hidden" name="action" value="delete">
+                        <input type="hidden" name="project_id" value="<?= $id ?>">
+                        <input type="hidden" name="attachment_id" id="pictureDeleteId" value="<?= (int)$imageAttachments[0]['id'] ?>">
+                        <button type="submit" class="btn btn-outline-danger btn-sm"><i class="bi bi-trash me-1"></i>Delete this picture</button>
+                    </form>
+                </div>
+            </div>
+            <div class="col-auto">
+                <button type="button" class="btn btn-outline-secondary btn-lg" id="btnPicNext" title="Next">
+                    <i class="bi bi-chevron-right"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
 
 <div class="card shadow-sm">
     <div class="card-header bg-white d-flex justify-content-between align-items-center">
         <h6 class="mb-0 section-title">
-            Attachments
+            Documents
             <?php if (!empty($attachments)): ?>
-                <span class="badge bg-secondary ms-1"><?= count($attachments) ?></span>
+                <span class="badge bg-secondary ms-1"><?= count($attachments) ?> file(s)</span>
             <?php endif; ?>
         </h6>
         <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#uploadModal">
             <i class="bi bi-upload me-1"></i> Upload Files
         </button>
     </div>
-    <div class="card-body">
+    <div class="card-body p-0">
         <?php if (empty($attachments)): ?>
-            <div class="text-center text-muted py-4">
-                <i class="bi bi-paperclip fs-1 d-block mb-2"></i>
-                <p>No files attached.</p>
+            <div class="text-center text-muted py-4 px-3">
+                <i class="bi bi-folder2-open fs-1 d-block mb-2"></i>
+                <p class="mb-0">No documents yet. Upload files to group them by date.</p>
             </div>
         <?php else: ?>
-            <div class="row g-3">
-                <?php foreach ($attachments as $att):
-                    $ext = strtolower(pathinfo($att['file_original_name'], PATHINFO_EXTENSION));
-                    $isImage = in_array($ext, ['jpg', 'jpeg', 'png', 'gif']);
-                    $isVideo = in_array($ext, ['mp4', 'avi', 'mov']);
-                    $isAudio = ($ext === 'mp3');
-                    $fileUrl = BASE_URL . '/uploads/' . $id . '/' . $att['file_name'];
-                    $sizeKB = round($att['file_size'] / 1024, 1);
-                    $sizeLabel = $sizeKB >= 1024 ? round($sizeKB / 1024, 1) . ' MB' : $sizeKB . ' KB';
-                    $icon = getFileTypeIcon($ext);
-                ?>
-                <div class="col-md-4 col-lg-3">
-                    <div class="card h-100 border">
-                        <?php if ($isImage): ?>
-                            <a href="<?= $fileUrl ?>" target="_blank">
-                                <img src="<?= $fileUrl ?>" class="card-img-top" alt="<?= sanitize($att['file_original_name']) ?>"
-                                     style="height: 140px; object-fit: cover;">
-                            </a>
-                        <?php elseif ($isVideo): ?>
-                            <div class="bg-light" style="height: 140px;">
-                                <video src="<?= $fileUrl ?>" class="w-100 h-100" style="object-fit: cover;" muted preload="metadata"></video>
-                            </div>
-                        <?php else: ?>
-                            <a href="<?= $fileUrl ?>" target="_blank" class="d-flex align-items-center justify-content-center bg-light" style="height: 140px;">
-                                <i class="bi <?= $icon ?> fs-1"></i>
-                            </a>
-                        <?php endif; ?>
-                        <div class="card-body p-2">
-                            <div class="small fw-medium text-truncate" title="<?= sanitize($att['file_original_name']) ?>">
-                                <?= sanitize($att['file_original_name']) ?>
-                            </div>
-                            <div class="d-flex justify-content-between align-items-center mt-1">
-                                <span class="text-muted" style="font-size:0.75rem">
-                                    <?= $sizeLabel ?>
-                                    <span class="badge bg-light text-dark ms-1" style="font-size:0.65rem">.<?= $ext ?></span>
-                                </span>
-                                <div class="btn-group btn-group-sm">
-                                    <a href="<?= $fileUrl ?>" class="btn btn-outline-primary btn-sm" target="_blank" title="Open">
-                                        <i class="bi bi-box-arrow-up-right"></i>
-                                    </a>
-                                    <form action="<?= BASE_URL ?>/actions/attachment_actions.php" method="POST" class="d-inline"
-                                          onsubmit="return confirm('Delete this file?')">
-                                        <input type="hidden" name="action" value="delete">
-                                        <input type="hidden" name="project_id" value="<?= $id ?>">
-                                        <input type="hidden" name="attachment_id" value="<?= $att['id'] ?>">
-                                        <button type="submit" class="btn btn-outline-danger btn-sm"><i class="bi bi-trash"></i></button>
-                                    </form>
-                                </div>
-                            </div>
-                            <?php if (!empty($att['description'])): ?>
-                                <div class="text-muted mt-1" style="font-size:0.75rem"><?= sanitize($att['description']) ?></div>
-                            <?php endif; ?>
-                        </div>
+            <?php foreach ($attachmentsByDate as $dateStr => $dayFiles): ?>
+                <div class="border-bottom pb-3 mb-3 px-3">
+                    <div class="fw-semibold small text-muted py-2 border-bottom mb-2">
+                        <i class="bi bi-calendar3 me-1"></i><?= formatDate($dateStr) ?>
+                        <span class="badge bg-light text-dark ms-2"><?= count($dayFiles) ?> file(s)</span>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="width:2rem"></th>
+                                    <th>Document</th>
+                                    <th class="text-end">Size</th>
+                                    <th>Description</th>
+                                    <th class="text-nowrap">Time</th>
+                                    <th style="width:8rem" class="text-end">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($dayFiles as $att):
+                                    $ext = strtolower(pathinfo($att['file_original_name'], PATHINFO_EXTENSION));
+                                    $fileUrl = BASE_URL . '/uploads/' . $id . '/' . $att['file_name'];
+                                    $sizeKB = round($att['file_size'] / 1024, 1);
+                                    $sizeLabel = $sizeKB >= 1024 ? round($sizeKB / 1024, 1) . ' MB' : $sizeKB . ' KB';
+                                    $icon = getFileTypeIcon($ext);
+                                    $uploadTime = !empty($att['uploaded_at']) ? date('g:i A', strtotime($att['uploaded_at'])) : '—';
+                                ?>
+                                <tr>
+                                    <td><i class="bi <?= $icon ?>"></i></td>
+                                    <td>
+                                        <a href="<?= $fileUrl ?>" target="_blank" class="text-decoration-none fw-medium text-truncate d-inline-block" style="max-width:220px" title="<?= sanitize($att['file_original_name']) ?>">
+                                            <?= sanitize($att['file_original_name']) ?>
+                                        </a>
+                                        <span class="badge bg-light text-dark ms-1" style="font-size:0.7rem">.<?= $ext ?></span>
+                                    </td>
+                                    <td class="text-end text-muted small"><?= $sizeLabel ?></td>
+                                    <td class="text-muted small"><?= !empty($att['description']) ? sanitize($att['description']) : '—' ?></td>
+                                    <td class="text-muted small text-nowrap"><?= $uploadTime ?></td>
+                                    <td class="text-end">
+                                        <a href="<?= $fileUrl ?>" class="btn btn-outline-primary btn-sm py-0 px-1" target="_blank" title="Open"><i class="bi bi-box-arrow-up-right"></i></a>
+                                        <form action="<?= BASE_URL ?>/actions/attachment_actions.php" method="POST" class="d-inline" onsubmit="return confirm('Delete this file?');">
+                                            <input type="hidden" name="action" value="delete">
+                                            <input type="hidden" name="project_id" value="<?= $id ?>">
+                                            <input type="hidden" name="attachment_id" value="<?= $att['id'] ?>">
+                                            <button type="submit" class="btn btn-outline-danger btn-sm py-0 px-1" title="Delete"><i class="bi bi-trash"></i></button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
-                <?php endforeach; ?>
-            </div>
-            <div class="text-muted small mt-3">
+            <?php endforeach; ?>
+            <div class="text-muted small px-3 pb-3 pt-0">
                 Total: <?= count($attachments) ?> file(s)
                 (<?= $totalFileSize >= 1048576 ? round($totalFileSize / 1048576, 1) . ' MB' : round($totalFileSize / 1024, 1) . ' KB' ?>)
             </div>
@@ -307,9 +364,38 @@ document.addEventListener("DOMContentLoaded", function() {
 });
 </script>';
 
+$pictureViewerScript = '';
+if (!empty($imageAttachments)) {
+    $pictureViewerScript = '<script>
+document.addEventListener("DOMContentLoaded", function() {
+    var card = document.getElementById("pictureViewerCard");
+    var img = document.getElementById("pictureViewerImg");
+    var caption = document.getElementById("pictureViewerCaption");
+    var deleteId = document.getElementById("pictureDeleteId");
+    var btnPrev = document.getElementById("btnPicPrev");
+    var btnNext = document.getElementById("btnPicNext");
+    if (!card || !img) return;
+    var images = [];
+    try { images = JSON.parse(card.dataset.images || "[]"); } catch (e) {}
+    var idx = 0;
+    function showPic(i) {
+        if (images.length === 0) return;
+        idx = (i + images.length) % images.length;
+        var o = images[idx];
+        img.src = o.url;
+        img.alt = o.file_original_name || "";
+        caption.textContent = (idx + 1) + " of " + images.length + " — " + (o.file_original_name || "") + " · " + (o.date_display || "—");
+        if (deleteId) deleteId.value = o.id;
+    }
+    if (btnPrev) btnPrev.addEventListener("click", function() { showPic(idx - 1); });
+    if (btnNext) btnNext.addEventListener("click", function() { showPic(idx + 1); });
+});
+</script>';
+}
+
 if (isset($pageScripts)) {
-    $pageScripts .= $fileUploadScript;
+    $pageScripts .= $fileUploadScript . $pictureViewerScript;
 } else {
-    $pageScripts = $fileUploadScript;
+    $pageScripts = $fileUploadScript . $pictureViewerScript;
 }
 ?>

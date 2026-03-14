@@ -158,26 +158,25 @@ if ($projectId > 0) {
             $pdf->SetFont('helvetica', 'B', 10);
             $pdf->SetFillColor(26, 86, 219);
             $pdf->SetTextColor(255, 255, 255);
-            $pdf->Cell(0, 6, ' Budget Breakdown', 0, 1, 'L', true);
+            $pdf->Cell(0, 6, ' Scope of Work', 0, 1, 'L', true);
             $pdf->SetTextColor(0, 0, 0);
             $pdf->Ln(2);
 
-            pdfTableHeader($pdf, [[8, '#', 'C'], [50, 'Item', 'L'], [30, 'Category', 'L'], [20, 'Qty', 'R'], [20, 'Unit', 'L'], [25, 'Unit Cost', 'R'], [27, 'Total', 'R']]);
+            pdfTableHeader($pdf, [[8, '#', 'C'], [60, 'Item', 'L'], [20, 'Qty', 'R'], [20, 'Unit', 'L'], [30, 'Unit Cost', 'R'], [32, 'Total', 'R']]);
 
             $total = 0;
             foreach ($budgetItems as $i => $item) {
                 $pdf->Cell(8, 5, $i + 1, 1, 0, 'C');
-                $pdf->Cell(50, 5, $item['item_name'], 1, 0);
-                $pdf->Cell(30, 5, $item['budget_category'], 1, 0);
+                $pdf->Cell(60, 5, $item['item_name'], 1, 0);
                 $pdf->Cell(20, 5, number_format($item['quantity'], 2), 1, 0, 'R');
                 $pdf->Cell(20, 5, $item['unit'], 1, 0);
-                $pdf->Cell(25, 5, formatCurrency($item['unit_cost']), 1, 0, 'R');
-                $pdf->Cell(27, 5, formatCurrency($item['total_cost']), 1, 1, 'R');
+                $pdf->Cell(30, 5, formatCurrency($item['unit_cost']), 1, 0, 'R');
+                $pdf->Cell(32, 5, formatCurrency($item['total_cost']), 1, 1, 'R');
                 $total += $item['total_cost'];
             }
             $pdf->SetFont('helvetica', 'B', 8);
-            $pdf->Cell(153, 5, 'TOTAL:', 1, 0, 'R');
-            $pdf->Cell(27, 5, formatCurrency($total), 1, 1, 'R');
+            $pdf->Cell(123, 5, 'TOTAL:', 1, 0, 'R');
+            $pdf->Cell(32, 5, formatCurrency($total), 1, 1, 'R');
             $pdf->Ln(4);
         }
     }

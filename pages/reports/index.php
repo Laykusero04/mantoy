@@ -54,7 +54,7 @@ if (empty($years)) $years = [(int)$currentFiscalYear];
                     <label class="form-label">Include Sections</label>
                     <div class="d-flex flex-wrap gap-2">
                         <div class="form-check"><input class="form-check-input" type="checkbox" name="sections[]" value="details" checked id="secDetails"><label class="form-check-label small" for="secDetails">Details</label></div>
-                        <div class="form-check"><input class="form-check-input" type="checkbox" name="sections[]" value="budget" checked id="secBudget"><label class="form-check-label small" for="secBudget">Budget</label></div>
+                        <div class="form-check"><input class="form-check-input" type="checkbox" name="sections[]" value="budget" checked id="secBudget"><label class="form-check-label small" for="secBudget">Scope of Work</label></div>
                         <div class="form-check"><input class="form-check-input" type="checkbox" name="sections[]" value="milestones" checked id="secMs"><label class="form-check-label small" for="secMs">Milestones</label></div>
                         <div class="form-check"><input class="form-check-input" type="checkbox" name="sections[]" value="log" checked id="secLog"><label class="form-check-label small" for="secLog">Action Log</label></div>
                     </div>

@@ -43,6 +43,17 @@ switch ($action) {
         redirect($redirectUrl);
         break;
 
+    case 'update_delivered':
+        $logId = (int)($_POST['log_id'] ?? 0);
+        $qtyDel = isset($_POST['quantity_delivered']) && $_POST['quantity_delivered'] !== '' ? max(0, (float)$_POST['quantity_delivered']) : null;
+        if ($logId > 0) {
+            $stmt = $pdo->prepare("UPDATE action_logs SET quantity_delivered = ? WHERE id = ? AND project_id = ?");
+            $stmt->execute([$qtyDel, $logId, $projectId]);
+            flashMessage('success', 'Quantity delivered updated.');
+        }
+        redirect($redirectUrl);
+        break;
+
     case 'delete':
         $logId = (int)($_POST['log_id'] ?? 0);
         if ($logId > 0) {

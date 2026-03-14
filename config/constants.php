@@ -20,10 +20,13 @@ define('ALLOWED_CAD_EXTENSIONS', ['dwg', 'dxf', 'skp', 'rvt']);
 // Project status options
 define('STATUS_OPTIONS', ['Not Started', 'In Progress', 'On Hold', 'Completed', 'Cancelled']);
 
+// Daily construction log: weather options (shared by backend and calendar modal)
+define('WEATHER_OPTIONS', ['Sunny', 'Cloudy', 'Partly Cloudy', 'Rain', 'Overcast', 'Clear', 'Storm', 'Fog', 'Windy', 'Other']);
+
 // Pagination
 define('ITEMS_PER_PAGE', 10);
 
 // App info
-define('APP_NAME', 'Barangay Dev Project Tracker');
+define('APP_NAME', 'Project Resource & Information System for Management');
 define('APP_VERSION', '1.0');
     

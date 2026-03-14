@@ -54,6 +54,19 @@ switch ($action) {
 
         $moduleType     = $_POST['module_type'] ?? 'general';
         $moduleRecordId = !empty($_POST['module_record_id']) ? (int)$_POST['module_record_id'] : null;
+        $category       = trim($_POST['category'] ?? '') ?: null;
+        $docType        = trim($_POST['doc_type'] ?? '');
+
+        // Detect if the attachments table actually has a `category` column.
+        // This lets uploads keep working even if the planning migration
+        // (which adds the column) has not been run yet.
+        $attachmentsHasCategory = false;
+        try {
+            $colCheck = $pdo->query("SHOW COLUMNS FROM attachments LIKE 'category'");
+            $attachmentsHasCategory = $colCheck && $colCheck->rowCount() > 0;
+        } catch (Exception $e) {
+            $attachmentsHasCategory = false;
+        }
 
         // Create project upload directory
         $projectDir = UPLOAD_DIR . $projectId . '/';
@@ -81,21 +94,45 @@ switch ($action) {
                 continue;
             }
 
-            // Save metadata (requires migration_v2.sql applied)
-            $stmt = $pdo->prepare("
-                INSERT INTO attachments (project_id, module_type, module_record_id, file_name, file_original_name, file_type, file_size, description)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            ");
-            $stmt->execute([
-                $projectId,
-                $moduleType,
-                $moduleRecordId,
-                $storedName,
-                $file['name'],
-                $file['type'],
-                $file['size'],
-                $descriptions[$idx] ?? '',
-            ]);
+            // Compute final description (optionally prefixed with document type)
+            $baseDescription = $descriptions[$idx] ?? '';
+            if ($docType !== '') {
+                $baseDescription = '[' . $docType . ']' . ($baseDescription !== '' ? ' ' . $baseDescription : '');
+            }
+
+            // Save metadata (uses category only when the column exists)
+            if ($category !== null && $attachmentsHasCategory) {
+                $stmt = $pdo->prepare("
+                    INSERT INTO attachments (project_id, module_type, module_record_id, category, file_name, file_original_name, file_type, file_size, description)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ");
+                $stmt->execute([
+                    $projectId,
+                    $moduleType,
+                    $moduleRecordId,
+                    $category,
+                    $storedName,
+                    $file['name'],
+                    $file['type'],
+                    $file['size'],
+                    $baseDescription,
+                ]);
+            } else {
+                $stmt = $pdo->prepare("
+                    INSERT INTO attachments (project_id, module_type, module_record_id, file_name, file_original_name, file_type, file_size, description)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ");
+                $stmt->execute([
+                    $projectId,
+                    $moduleType,
+                    $moduleRecordId,
+                    $storedName,
+                    $file['name'],
+                    $file['type'],
+                    $file['size'],
+                    $baseDescription,
+                ]);
+            }
 
             $successCount++;
         }

@@ -72,11 +72,106 @@ body {
 #main-content {
     margin-left: var(--sidebar-width);
     min-height: calc(100vh - var(--navbar-height));
+    min-width: 0;
+    overflow-x: hidden;
 }
 
 /* ----- Footer ----- */
 #main-footer {
     margin-left: var(--sidebar-width);
+}
+
+/* ----- Project Event Modal (Calendar) ----- */
+#projectEventModal .modal-dialog {
+    max-width: min(820px, 92vw);
+    max-height: calc(100vh - 2rem);
+    margin-left: auto;
+    margin-right: auto;
+    display: flex;
+    flex-direction: column;
+}
+
+#projectEventModal .modal-content {
+    max-height: calc(100vh - 2rem);
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+/* Form wraps header/body/footer: must be flex so body can scroll */
+#projectEventModal .modal-content form {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+}
+
+#projectEventModal .modal-header,
+#projectEventModal .modal-footer {
+    flex-shrink: 0;
+}
+
+#projectEventModal .modal-body {
+    padding: 1rem 1.25rem;
+    min-width: 0;
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: calc(100vh - 11rem);
+    overflow-y: scroll !important;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+}
+
+/* Force visible scrollbar (Windows, Linux, and when overlay scrollbars are off) */
+#projectEventModal .modal-body::-webkit-scrollbar {
+    width: 12px;
+}
+#projectEventModal .modal-body::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 6px;
+}
+#projectEventModal .modal-body::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 6px;
+}
+#projectEventModal .modal-body::-webkit-scrollbar-thumb:hover {
+    background: #a1a1a1;
+}
+
+#projectEventModal #projectEventSowTableWrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+#projectEventModal #projectEventSowTableWrap .table {
+    margin-bottom: 0;
+    min-width: 680px;
+}
+
+#projectEventModal #projectEventSowTableWrap th,
+#projectEventModal #projectEventSowTableWrap td {
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
+#projectEventModal #projectEventSowTableWrap td:first-child {
+    white-space: normal;
+    min-width: 160px;
+}
+
+#projectEventModal #projectEventSowTableWrap .sow-unit {
+    white-space: normal;
+}
+
+#projectEventModal .form-label {
+    margin-bottom: 0.25rem;
+}
+
+#projectEventModal .mb-3 {
+    margin-bottom: 1rem !important;
 }
 
 /* ----- Dashboard Cards ----- */
@@ -255,3 +350,815 @@ body {
     background-color: #d1d5db;
     border-radius: 4px;
 }
+
+/* ----- Project Timeline (Gantt) - High contrast, screen + print ----- */
+.timeline-wrap {
+    --gantt-bar-height: 26px;
+    --gantt-day-width: 52px;
+    --gantt-day-width-no-work: 64px;
+    min-width: 0;
+    overflow-x: hidden;
+    /* Planned: dark so it’s clearly visible and prints well */
+    --gantt-planned: #1e3a5f;
+    --gantt-planned-border: #0f172a;
+    /* Actual: strong green and blue, high contrast vs planned */
+    --gantt-actual: #047857;
+    --gantt-actual-border: #065f46;
+    --gantt-actual-alt: #0369a1;
+    --gantt-actual-alt-border: #075985;
+}
+
+.timeline-wrap .card {
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.04);
+}
+
+.timeline-wrap .card-header {
+    border-bottom: 2px solid #e2e8f0;
+    padding: 1rem 1.25rem;
+}
+
+.timeline-wrap .card-body {
+    padding: 1.25rem;
+    min-width: 0;
+    overflow-x: hidden;
+}
+
+.timeline-wrap .section-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #1e293b;
+}
+
+.timeline-summary-cards {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 1.25rem;
+}
+
+.timeline-summary-cards .card {
+    border-radius: 0.5rem;
+    border: 1px solid #e2e8f0;
+    min-width: 140px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+
+.timeline-summary-cards .card-body {
+    padding: 0.75rem 1rem;
+}
+
+.timeline-legend {
+    display: inline-flex;
+    align-items: center;
+    gap: 1.25rem;
+    flex-wrap: wrap;
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: #475569;
+    padding: 0.4rem 0.85rem;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.375rem;
+}
+
+.timeline-legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.timeline-legend .legend-bar {
+    width: 24px;
+    height: 12px;
+    border-radius: 4px;
+}
+
+.timeline-legend .legend-bar.planned {
+    background: var(--gantt-planned) !important;
+    border: 1px solid var(--gantt-planned-border);
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+}
+.timeline-legend .legend-bar.actual {
+    background: var(--gantt-actual) !important;
+    border: 1px solid var(--gantt-actual-border);
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+}
+.timeline-legend .legend-bar.actual-alt {
+    background: var(--gantt-actual-alt) !important;
+    border: 1px solid var(--gantt-actual-alt-border);
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+}
+.timeline-legend .legend-today {
+    display: inline-block;
+    width: 20px;
+    height: 10px;
+    border: 2px solid #dc2626;
+    border-radius: 2px;
+    box-sizing: border-box;
+}
+.timeline-legend .legend-no-work {
+    display: inline-block;
+    width: 20px;
+    height: 10px;
+    background: repeating-linear-gradient(-45deg, #fecaca, #fecaca 2px, #fca5a5 2px, #fca5a5 4px);
+    border-radius: 2px;
+    vertical-align: middle;
+}
+
+/* Timeline: project title above table (full-width, readable) */
+.timeline-project-title-bar {
+    width: 100%;
+    max-width: 100%;
+    padding: 1rem 1.25rem;
+    background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+    border: 1px solid #cbd5e1;
+    border-radius: 0.5rem;
+    box-sizing: border-box;
+}
+.timeline-project-title-label {
+    display: block;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #64748b;
+    margin-bottom: 0.35rem;
+}
+.timeline-project-title-text {
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: #1e293b;
+    line-height: 1.45;
+    word-break: normal;
+    overflow-wrap: break-word;
+    white-space: normal;
+    max-width: 100%;
+}
+
+/* Timeline spreadsheet - clearer typography and spacing */
+.timeline-spreadsheet {
+    font-size: 0.875rem;
+    border: 1px solid #e2e8f0;
+}
+
+.timeline-spreadsheet th {
+    white-space: nowrap;
+    font-weight: 600;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #475569;
+    padding: 0.65rem 0.75rem;
+}
+
+.timeline-spreadsheet.timeline-gantt-table { table-layout: fixed; }
+.timeline-spreadsheet .col-id { width: 52px; min-width: 52px; max-width: 52px; text-align: center; }
+.timeline-spreadsheet .col-desc { width: 320px; min-width: 320px; max-width: 320px; }
+.timeline-spreadsheet .col-status { width: 80px; min-width: 80px; }
+.timeline-spreadsheet .col-duration { width: 100px; min-width: 100px; max-width: 100px; text-align: center; box-sizing: border-box; }
+.timeline-spreadsheet .col-start { width: 172px; min-width: 172px; max-width: 172px; overflow: visible; box-sizing: border-box; }
+.timeline-spreadsheet .col-end {
+    width: 172px;
+    min-width: 172px;
+    max-width: 172px;
+    overflow: visible;
+    padding-right: 0.5rem;
+    box-sizing: border-box;
+}
+.timeline-spreadsheet .gantt-bar-cell { min-width: 240px; }
+.timeline-spreadsheet .planned-row { background: #f8fafc; }
+.timeline-spreadsheet .planned-row td { padding: 0.5rem 0.75rem; vertical-align: middle; border-color: #e2e8f0; min-height: 44px; box-sizing: border-box; }
+.timeline-spreadsheet .actual-row { background: #fff; }
+.timeline-spreadsheet .actual-row td { padding: 0.5rem 0.75rem; vertical-align: middle; border-color: #e2e8f0; min-height: 40px; box-sizing: border-box; }
+/* Duration/Start/End: content fits without overlapping */
+.timeline-spreadsheet .col-duration .no-print-inline {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.2rem;
+}
+.timeline-spreadsheet .col-duration .planned-duration-input { width: 3.5rem; }
+.timeline-spreadsheet .col-duration small.text-muted { font-size: 0.75rem; }
+.timeline-spreadsheet .col-end .no-print-inline {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem;
+    justify-content: flex-start;
+}
+/* Date inputs: enough right padding so native calendar icon isn't clipped */
+.timeline-spreadsheet .col-start input[type="date"].form-control-sm,
+.timeline-spreadsheet .col-end input[type="date"].form-control-sm {
+    box-sizing: border-box;
+    padding-right: 2.25rem;
+    min-height: 2rem;
+}
+/* Date inputs wide enough to show full year (e.g. 23/03/2026) without truncation */
+.timeline-spreadsheet .col-start input.form-control-sm {
+    width: 10.5rem;
+    min-width: 10.5rem;
+    max-width: calc(100% - 0.25rem);
+    box-sizing: border-box;
+    padding-right: 2.25rem;
+    display: block;
+}
+.timeline-spreadsheet .col-end input.form-control-sm {
+    width: 10.5rem;
+    min-width: 10.5rem;
+    max-width: 100%;
+    box-sizing: border-box;
+    padding-right: 2.25rem;
+    display: block;
+}
+.timeline-spreadsheet .col-start,
+.timeline-spreadsheet .col-end {
+    vertical-align: middle;
+}
+.timeline-spreadsheet .col-end .btn-sm { flex-shrink: 0; white-space: nowrap; }
+.timeline-spreadsheet .date-header-cell {
+    min-width: var(--gantt-day-width);
+    width: var(--gantt-day-width);
+    padding: 0.35rem 0.2rem;
+    text-align: center;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #475569;
+    border-bottom: 2px solid #e2e8f0;
+    vertical-align: bottom;
+    line-height: 1.25;
+    box-sizing: border-box;
+    overflow: hidden;
+    word-break: break-word;
+}
+.timeline-spreadsheet .date-header-cell.weekend { background: #cbd5e1; color: #475569; }
+.timeline-spreadsheet .date-header-cell.no-work {
+    background: #fecaca;
+    color: #991b1b;
+    width: var(--gantt-day-width-no-work);
+    min-width: var(--gantt-day-width-no-work);
+}
+.timeline-spreadsheet thead .date-header-cell { background: #f1f5f9; }
+.timeline-spreadsheet thead .date-header-cell.weekend { background: #94a3b8; color: #fff; }
+.timeline-spreadsheet thead .date-header-cell.no-work {
+    background: #dc2626;
+    color: #fff;
+    width: var(--gantt-day-width-no-work);
+    min-width: var(--gantt-day-width-no-work);
+}
+.timeline-spreadsheet .sticky-col {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    background: inherit;
+    box-shadow: 2px 0 4px rgba(0,0,0,0.04);
+    overflow: visible;
+}
+.timeline-spreadsheet .sticky-col-0 { left: 0; }
+.timeline-spreadsheet .sticky-col-1 { left: 52px; }
+.timeline-spreadsheet .sticky-col-2 { left: 372px; }
+.timeline-spreadsheet .sticky-col-3 { left: 452px; }
+.timeline-spreadsheet .sticky-col-4 { left: 542px; }
+.timeline-spreadsheet .sticky-col-5 { left: 684px; }
+.timeline-spreadsheet thead .sticky-col { background: #f8f9fa; }
+.timeline-spreadsheet .planned-row .sticky-col { background: #f8fafc; }
+.timeline-spreadsheet .actual-row .sticky-col { background: #fff; }
+.timeline-spreadsheet .task-desc-cell.sticky-col { background: #f1f5f9; }
+.timeline-spreadsheet thead .task-desc-cell.sticky-col { background: #e2e8f0; }
+.timeline-spreadsheet tbody tr:hover .task-desc-cell.sticky-col { background: #e2e8f0; }
+.timeline-spreadsheet .task-desc-cell {
+    background: #f1f5f9;
+    vertical-align: middle;
+    font-weight: 600;
+    color: #1e293b;
+    word-break: normal;
+    overflow-wrap: break-word;
+    white-space: normal;
+    line-height: 1.35;
+    padding: 0.5rem 0.75rem;
+}
+.timeline-spreadsheet thead .task-desc-cell {
+    background: #e2e8f0;
+    color: #334155;
+}
+.timeline-spreadsheet tbody tr:hover .task-desc-cell {
+    background: #e2e8f0;
+}
+.timeline-spreadsheet .timeline-actions-row td {
+    padding: 0.4rem 0.75rem;
+    background: #fafafa;
+    border-color: #e2e8f0;
+}
+
+/* Wrapper: strict width boundary so timeline doesn't stretch the page */
+.timeline-gantt-scroll-wrapper {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow: hidden;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    background: #fff;
+    box-sizing: border-box;
+}
+
+/* Scroll hint above the timeline */
+.timeline-gantt-scroll-hint {
+    font-size: 0.8rem;
+    color: #64748b;
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+.timeline-gantt-scroll-hint i {
+    font-size: 1rem;
+    opacity: 0.8;
+}
+
+/* Gantt scroll container - horizontal scroll only, clearly contained */
+.timeline-gantt-scroll {
+    display: block;
+    overflow-x: scroll;
+    overflow-y: visible;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    -webkit-overflow-scrolling: touch;
+    /* Firefox: visible scrollbar */
+    scrollbar-width: auto;
+    scrollbar-color: #64748b #e2e8f0;
+}
+/* Chrome/Safari: prominent horizontal scrollbar (easy to see and use) */
+.timeline-gantt-scroll::-webkit-scrollbar {
+    height: 14px;
+}
+.timeline-gantt-scroll::-webkit-scrollbar-track {
+    background: #e2e8f0;
+    border-radius: 0 0 6px 6px;
+    margin: 0 4px;
+}
+.timeline-gantt-scroll::-webkit-scrollbar-thumb {
+    background: #475569;
+    border-radius: 6px;
+    min-width: 60px;
+}
+.timeline-gantt-scroll::-webkit-scrollbar-thumb:hover {
+    background: #334155;
+}
+.timeline-gantt-scroll::-webkit-scrollbar-thumb:active {
+    background: #1e293b;
+}
+
+
+.timeline-gantt-table {
+    table-layout: fixed;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+/* Planning tab: subtle borders around each scope group */
+.planning-gantt-table .planning-scope-group tr:nth-child(2) td {
+    border-top: 1px solid #e2e8f0;
+}
+.planning-gantt-table .planning-scope-group tr:last-child td {
+    border-bottom: 1px solid #e2e8f0;
+}
+.planning-gantt-table .planning-scope-group td:first-child {
+    border-left: 1px solid #e2e8f0;
+}
+.planning-gantt-table .planning-scope-group td:last-child {
+    border-right: 1px solid #e2e8f0;
+}
+.planning-gantt-table .planning-scope-group + .planning-scope-group tr:nth-child(2) td {
+    border-top: 1px solid #e2e8f0;
+}
+.planning-gantt-table .planning-add-breakdown-row td {
+    background: #f8fafc;
+    vertical-align: middle;
+    border-color: #e2e8f0 !important;
+}
+.planning-gantt-table .planning-add-row-cell {
+    background: #f8fafc !important;
+}
+/* Planning: compact + button only (cleaner) */
+.planning-add-btn {
+    width: 1.75rem;
+    height: 1.75rem;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    border: 1px solid #94a3b8;
+    color: #475569;
+    background: #fff;
+    transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.planning-add-btn:hover {
+    border-color: #3b82f6;
+    color: #2563eb;
+    background: #eff6ff;
+}
+.planning-add-btn i {
+    font-size: 1rem;
+    line-height: 1;
+}
+/* + button row: align with description, consistent padding */
+.planning-gantt-table .planning-add-breakdown-row .col-desc {
+    padding: 0.5rem 0.75rem;
+}
+.planning-gantt-table .planning-add-breakdown-row .col-desc form {
+    display: inline-flex;
+    align-items: center;
+}
+/* Planning table: slightly better spacing and clarity */
+.planning-gantt-table .col-desc {
+    min-width: 180px;
+}
+.planning-gantt-table .table-light.planned-row td {
+    vertical-align: middle;
+}
+/* SOW row = total of all activities under it: distinct background and bar color */
+.planning-gantt-table tr.planning-sow-row td {
+    background: #dbeafe !important;
+    border-color: #93c5fd;
+}
+/* SOW bar: dark blue (total row) */
+.planning-gantt-table tr.planning-sow-row .gantt-day-cell.bar-planned.bar-sow {
+    background: #1e3a5f !important;
+    border-color: #0f172a !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+}
+.planning-gantt-table tr.planning-sow-row .gantt-day-cell.bar-planned.bar-sow.bar-start {
+    border-top-left-radius: 6px;
+    border-bottom-left-radius: 6px;
+}
+.planning-gantt-table tr.planning-sow-row .gantt-day-cell.bar-planned.bar-sow.bar-end {
+    border-top-right-radius: 6px;
+    border-bottom-right-radius: 6px;
+}
+.planning-gantt-table .planned-row .form-control-sm {
+    font-size: 0.8125rem;
+}
+/* Planning: planned duration column – stable box, no layout jump */
+.planning-gantt-table .col-duration {
+    width: 11rem;
+    min-width: 11rem;
+    max-width: 11rem;
+    text-align: center;
+    vertical-align: middle;
+    box-sizing: border-box;
+}
+.planning-gantt-table .col-duration .planned-duration-input,
+.planning-gantt-table .col-duration .wbs-duration-input {
+    width: 4rem;
+    min-width: 4rem;
+    max-width: 4.5rem;
+    margin: 0 auto;
+    display: inline-block;
+    box-sizing: border-box;
+}
+.planning-gantt-table .col-duration small.text-muted {
+    display: block;
+    font-size: 0.7rem;
+    margin-top: 0.15rem;
+    white-space: nowrap;
+}
+.planning-gantt-table tr.planning-sow-row .col-duration span.text-muted,
+.planning-gantt-table tr.planning-sow-row .col-duration small.text-muted {
+    display: inline;
+    vertical-align: middle;
+}
+.planning-gantt-table tr.planning-sow-row .col-duration small.text-muted {
+    margin-top: 0;
+    margin-left: 0.15rem;
+}
+/* Planning WBS: Save/Delete visible only on row hover */
+/* Activity cell: code box (full height) | body (activity name row + Resources button), aligned to description */
+.planning-gantt-table .planning-activity-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.35rem;
+}
+.planning-gantt-table .planning-activity-code-wrap {
+    flex-shrink: 0;
+    width: 3.5rem;
+    min-width: 3.5rem;
+    min-height: 2.5rem;
+    display: flex;
+    align-items: stretch;
+}
+.planning-gantt-table .planning-activity-code-wrap .planning-code-input {
+    width: 100%;
+    min-width: 0;
+    min-height: 100%;
+    height: 100%;
+    text-align: center;
+    box-sizing: border-box;
+}
+.planning-gantt-table .planning-activity-body {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    justify-content: flex-start;
+}
+.planning-gantt-table .planning-activity-row {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    gap: 0.5rem;
+}
+.planning-gantt-table .planning-activity-row .planning-wbs-name-form {
+    display: flex;
+    align-items: center;
+    flex: 1;
+    min-width: 0;
+    gap: 0.5rem;
+}
+/* Code (1.1, 2.1) – when inside form (fallback) */
+.planning-gantt-table .planning-code-input,
+.planning-gantt-table .wbs-code-input.planning-code-input {
+    width: 3.5rem;
+    min-width: 3.5rem;
+    max-width: 3.5rem;
+    flex-shrink: 0;
+    text-align: center;
+}
+.planning-gantt-table .planning-wbs-name-form .wbs-desc-input {
+    flex: 1;
+    min-width: 6rem;
+}
+.planning-gantt-table .planning-activity-row .planning-row-actions {
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    margin-left: auto;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+.planning-gantt-table tr.wbs-row:hover .planning-row-actions,
+.planning-gantt-table tr.sow-task-row:hover .planning-row-actions {
+    opacity: 1;
+}
+.planning-gantt-table tr.wbs-row .col-desc.planning-wbs-desc-cell {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    gap: 0.5rem;
+}
+.planning-gantt-table tr.wbs-row .planning-wbs-name-form {
+    display: flex;
+    align-items: center;
+    flex: 1;
+    min-width: 0;
+    gap: 0.5rem;
+}
+.planning-gantt-table tr.wbs-row .planning-wbs-name-form .wbs-code-input {
+    width: 3.5rem;
+    min-width: 3.5rem;
+    flex-shrink: 0;
+    text-align: center;
+}
+.planning-gantt-table tr.wbs-row .planning-wbs-name-form .wbs-desc-input {
+    flex: 1;
+    min-width: 6rem;
+}
+.planning-gantt-table tr.wbs-row .planning-row-actions {
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    margin-left: auto;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+.planning-gantt-table tr.wbs-row:hover .planning-row-actions {
+    opacity: 1;
+}
+/* Resources row: same box size and align as activity name (code spacer | button = description width | actions spacer) */
+.planning-gantt-table .planning-resources-row-wrap {
+    width: 100%;
+    min-width: 0;
+}
+.planning-gantt-table .planning-resources-code-spacer {
+    flex-shrink: 0;
+    width: 3.5rem;
+    min-width: 3.5rem;
+}
+.planning-gantt-table .planning-resources-actions-spacer {
+    flex-shrink: 0;
+    width: 5.5rem;
+    min-width: 5.5rem;
+}
+/* Spread / Start / End dropdown in planning resources – wide enough to show full labels */
+.planning-use-rule-select {
+    min-width: 5.5rem;
+    width: 5.5rem;
+}
+/* Resources row: align content to description left and end box (same horizontal bounds as activity) */
+.planning-gantt-table .planning-resources-td {
+    box-sizing: border-box;
+}
+.planning-gantt-table .planning-resources-vertical {
+    width: 100%;
+}
+.planning-scroll-hint {
+    font-size: 0.8rem;
+    color: #64748b;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+.planning-scroll-hint i {
+    font-size: 0.9rem;
+    opacity: 0.85;
+}
+
+.timeline-gantt-table .gantt-task-cell {
+    padding: 0.6rem 0.75rem;
+    vertical-align: middle;
+    font-size: 0.875rem;
+}
+
+/* Cell-based Gantt bars: one cell per day, bar = filled cells by date range */
+.timeline-gantt-table .gantt-day-cell {
+    width: var(--gantt-day-width);
+    min-width: var(--gantt-day-width);
+    height: 36px;
+    padding: 0;
+    vertical-align: middle;
+    border-right: 1px solid #e2e8f0;
+    border-bottom: 1px solid #e2e8f0;
+    background: #fafafa;
+}
+.timeline-gantt-table .gantt-day-cell.no-work {
+    width: var(--gantt-day-width-no-work);
+    min-width: var(--gantt-day-width-no-work);
+}
+
+.timeline-gantt-table .planned-row .gantt-day-cell {
+    background: #f8fafc;
+}
+
+.timeline-gantt-table .planned-row .gantt-day-cell.weekend {
+    background: #e2e8f0;
+}
+.timeline-gantt-table .planned-row .gantt-day-cell.no-work {
+    background: repeating-linear-gradient(-45deg, #fecaca, #fecaca 4px, #fca5a5 4px, #fca5a5 8px);
+}
+
+.timeline-gantt-table .planned-row .gantt-day-cell.bar-planned {
+    background: var(--gantt-planned) !important;
+    border-color: var(--gantt-planned-border) !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+}
+/* Work breakdown bars: lighter blue */
+.planning-gantt-table tr.wbs-row .gantt-day-cell.bar-planned {
+    background: #60a5fa !important;
+    border-color: #3b82f6 !important;
+}
+.timeline-gantt-table .planned-row .gantt-day-cell.bar-planned.bar-start {
+    border-top-left-radius: 6px;
+    border-bottom-left-radius: 6px;
+}
+.timeline-gantt-table .planned-row .gantt-day-cell.bar-planned.bar-end {
+    border-top-right-radius: 6px;
+    border-bottom-right-radius: 6px;
+}
+
+.timeline-gantt-table .actual-row .gantt-day-cell {
+    background: #fff;
+}
+
+.timeline-gantt-table .actual-row .gantt-day-cell.weekend {
+    background: #f1f5f9;
+}
+.timeline-gantt-table .actual-row .gantt-day-cell.no-work {
+    background: repeating-linear-gradient(-45deg, #fee2e2, #fee2e2 4px, #fecaca 4px, #fecaca 8px);
+}
+
+.timeline-gantt-table .actual-row .gantt-day-cell.bar-actual {
+    background: var(--gantt-actual) !important;
+    border-color: var(--gantt-actual-border) !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+}
+
+.timeline-gantt-table .actual-row .gantt-day-cell.bar-actual-alt {
+    background: var(--gantt-actual-alt) !important;
+    border-color: var(--gantt-actual-alt-border) !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+}
+
+.timeline-gantt-table .actual-row .gantt-day-cell.bar-actual.bar-start,
+.timeline-gantt-table .actual-row .gantt-day-cell.bar-actual-alt.bar-start {
+    border-top-left-radius: 6px;
+    border-bottom-left-radius: 6px;
+}
+
+.timeline-gantt-table .actual-row .gantt-day-cell.bar-actual.bar-end,
+.timeline-gantt-table .actual-row .gantt-day-cell.bar-actual-alt.bar-end {
+    border-top-right-radius: 6px;
+    border-bottom-right-radius: 6px;
+}
+
+/* Today indicator */
+.timeline-gantt-table .gantt-day-cell.today {
+    box-shadow: inset 0 0 0 2px rgba(220, 38, 38, 0.6);
+}
+
+.timeline-gantt-table .gantt-day-cell.today.bar-planned,
+.timeline-gantt-table .gantt-day-cell.today.bar-actual,
+.timeline-gantt-table .gantt-day-cell.today.bar-actual-alt {
+    box-shadow: inset 0 0 0 2px #fff, inset 0 0 0 4px rgba(220, 38, 38, 0.7);
+}
+
+/* ----- Timeline: Print / PDF ----- */
+@media print {
+    .no-print,
+    .navbar,
+    #sidebar,
+    .sidebar-toggle,
+    .timeline-wrap .card-header .btn,
+    .timeline-wrap .card-header form,
+    .timeline-wrap .card-body .btn,
+    .timeline-wrap .timeline-actions-row,
+    .timeline-wrap .no-print-inline,
+    .timeline-wrap input[type="date"],
+    .timeline-wrap input[type="number"],
+    .timeline-wrap button[type="submit"],
+    .timeline-wrap .planned-duration-input,
+    .timeline-wrap .btn-edit-timeline,
+    .timeline-wrap .alert,
+    .breadcrumb,
+    #main-content .container-fluid > .alert {
+        display: none !important;
+    }
+    .timeline-wrap .print-only {
+        display: inline !important;
+    }
+    .timeline-printable {
+        padding: 0 !important;
+        margin: 0 !important;
+        border: none !important;
+        box-shadow: none !important;
+    }
+    .timeline-printable .print-only-title {
+        display: block !important;
+        font-size: 1.25rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+        color: #000;
+    }
+    .timeline-wrap .card,
+    .timeline-wrap .card-body,
+    .timeline-gantt-scroll {
+        border: none !important;
+        box-shadow: none !important;
+        overflow: visible !important;
+    }
+    .timeline-gantt-table .gantt-day-cell,
+    .timeline-gantt-table .planned-row .gantt-day-cell.bar-planned,
+    .timeline-gantt-table .actual-row .gantt-day-cell.bar-actual,
+    .timeline-gantt-table .actual-row .gantt-day-cell.bar-actual-alt {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+    body { background: #fff !important; }
+    #main-content { margin-left: 0 !important; }
+}
+
+.timeline-wrap .print-only-title {
+    display: none;
+}
+
+.timeline-wrap .print-only {
+    display: none;
+}
+
+/* Task list table (details) */
+.timeline-tasks-table .task-name {
+    font-weight: 600;
+    color: #1e293b;
+}
+
+.timeline-tasks-table .sow-badge {
+    font-size: 0.7rem;
+    font-weight: 500;
+}
+
+.timeline-tasks-table .planned-cell { color: #64748b; }
+.timeline-tasks-table .actual-cell { color: #0c4a6e; }
+.timeline-tasks-table .empty-actual { color: #94a3b8; font-style: italic; }

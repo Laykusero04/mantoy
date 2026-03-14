@@ -33,22 +33,30 @@ $activeTab = $_GET['tab'] ?? 'overview';
 
 // Available tabs (enabled: false hides tabs not yet implemented)
 $tabs = [
-    'overview'       => ['label' => 'Overview',       'icon' => 'bi-house',             'enabled' => true],
-    'pow'            => ['label' => 'POW',            'icon' => 'bi-list-check',        'enabled' => false],
-    'daily_logs'     => ['label' => 'Daily Logs',     'icon' => 'bi-calendar-day',      'enabled' => false],
-    'accomplishment' => ['label' => 'Accomplishment', 'icon' => 'bi-graph-up',          'enabled' => false],
-    'inspections'    => ['label' => 'Inspections',    'icon' => 'bi-clipboard-check',   'enabled' => false],
-    'photos'         => ['label' => 'Photos',         'icon' => 'bi-camera',            'enabled' => false],
-    'calendar'       => ['label' => 'Calendar',       'icon' => 'bi-calendar-event',    'enabled' => true],
-    'letters'        => ['label' => 'Letters',        'icon' => 'bi-envelope',          'enabled' => false],
-    'workflow'       => ['label' => 'Workflow',       'icon' => 'bi-diagram-3',         'enabled' => true],
-    'budget'         => ['label' => 'Budget',         'icon' => 'bi-wallet2',           'enabled' => true],
-    'milestones'     => ['label' => 'Milestones',     'icon' => 'bi-flag',              'enabled' => true],
-    'log'            => ['label' => 'Action Log',     'icon' => 'bi-journal-text',      'enabled' => true],
-    'files'          => ['label' => 'Files',          'icon' => 'bi-paperclip',         'enabled' => true],
-    'turnover'       => ['label' => 'Turnover',       'icon' => 'bi-box-arrow-right',   'enabled' => false],
+    'overview'        => ['label' => 'Overview',           'icon' => 'bi-house',           'enabled' => true],
+    'pow'             => ['label' => 'POW',                'icon' => 'bi-list-check',      'enabled' => false],
+    'daily_logs'      => ['label' => 'Daily Logs',         'icon' => 'bi-calendar-day',    'enabled' => false],
+    'accomplishment'  => ['label' => 'Accomplishment',     'icon' => 'bi-graph-up',        'enabled' => false],
+    'inspections'     => ['label' => 'Inspections',        'icon' => 'bi-clipboard-check', 'enabled' => false],
+    'photos'          => ['label' => 'Photos',             'icon' => 'bi-camera',          'enabled' => false],
+    'calendar'        => ['label' => 'Calendar',           'icon' => 'bi-calendar-event',  'enabled' => true],
+    'letters'         => ['label' => 'Letters',            'icon' => 'bi-envelope',        'enabled' => false],
+    'budget'          => ['label' => 'Scope of Work',      'icon' => 'bi-wallet2',         'enabled' => true],
+    'dupa'            => ['label' => 'DUPA',               'icon' => 'bi-cash-stack',      'enabled' => true],
+    'milestones'      => ['label' => 'Milestones',         'icon' => 'bi-flag',            'enabled' => true],
+    'monitoring'      => ['label' => 'Monitoring',         'icon' => 'bi-graph-up-arrow',  'enabled' => true],
+    'log'             => ['label' => 'Action Log',         'icon' => 'bi-journal-text',    'enabled' => true],
+    'preconstruction' => ['label' => 'Pre-Construction',   'icon' => 'bi-folder2-open',    'enabled' => true],
+    'files'           => ['label' => 'Files',              'icon' => 'bi-paperclip',       'enabled' => true],
+    'closeout'        => ['label' => 'Closeout',           'icon' => 'bi-clipboard-check', 'enabled' => true],
+    'turnover'        => ['label' => 'Turnover',           'icon' => 'bi-box-arrow-right', 'enabled' => false],
 ];
 
+// Planning content lives under Scope of Work (Budget tab includes planning.php)
+// Allow tab=planning so links to Planning open Budget tab which embeds the Planning Gantt
+if ($activeTab === 'planning') {
+    $activeTab = 'budget';
+}
 // Fall back to overview if the requested tab is disabled
 if (!isset($tabs[$activeTab]) || !$tabs[$activeTab]['enabled']) {
     $activeTab = 'overview';
@@ -102,10 +110,10 @@ if (!isset($tabs[$activeTab]) || !$tabs[$activeTab]['enabled']) {
 </div>
 
 <!-- Tabs (scrollable) -->
-<ul class="nav nav-tabs nav-tabs-scrollable mb-4">
+<ul class="nav nav-tabs nav-tabs-scrollable mb-4" id="projectTabsNav" data-project-id="<?= $id ?>">
     <?php foreach ($tabs as $tabKey => $tabInfo): ?>
         <?php if (!$tabInfo['enabled']) continue; ?>
-    <li class="nav-item">
+    <li class="nav-item project-tab-item" data-tab-key="<?= $tabKey ?>" draggable="true">
         <a class="nav-link <?= $activeTab === $tabKey ? 'active' : '' ?>"
            href="?id=<?= $id ?>&tab=<?= $tabKey ?>">
             <i class="bi <?= $tabInfo['icon'] ?> me-1"></i><?= $tabInfo['label'] ?>
@@ -126,6 +134,48 @@ if (file_exists($tabFile)) {
     </div>';
 }
 ?>
+<script>
+(function() {
+    var id = '<?= (int)$id ?>';
+    var tab = '<?= htmlspecialchars($activeTab ?? '', ENT_QUOTES, 'UTF-8') ?>';
+    if (!id) return;
+    var key = 'scroll_view_' + id + '_' + tab;
+    var scrollOpt = { behavior: 'auto' };
+    try {
+        var saved = sessionStorage.getItem(key);
+        if (saved !== null) {
+            sessionStorage.removeItem(key);
+            var y = Math.max(0, parseInt(saved, 10) || 0);
+            if (typeof history !== 'undefined' && history.scrollRestoration) history.scrollRestoration = 'manual';
+            function applyScroll() { window.scrollTo(0, y, scrollOpt); }
+            var guardEnd = 0;
+            function runRestore() {
+                applyScroll();
+                if (y > 0) guardEnd = Date.now() + 1200;
+            }
+            runRestore();
+            requestAnimationFrame(runRestore);
+            window.addEventListener('load', function() {
+                runRestore();
+                setTimeout(runRestore, 0);
+                setTimeout(runRestore, 50);
+                setTimeout(runRestore, 150);
+                setTimeout(runRestore, 350);
+                setTimeout(runRestore, 600);
+            });
+            (function scrollGuard() {
+                if (guardEnd && Date.now() < guardEnd) {
+                    if (window.scrollY === 0 && y > 0) window.scrollTo(0, y, scrollOpt);
+                    requestAnimationFrame(scrollGuard);
+                }
+            })();
+        }
+    } catch (e) {}
+    window.saveViewScroll = function() {
+        try { sessionStorage.setItem(key, String(window.scrollY || document.documentElement.scrollTop)); } catch (e) {}
+    };
+})();
+</script>
 
 <!-- Delete Project Modal -->
 <div class="modal fade" id="deleteModal" tabindex="-1">
@@ -153,20 +203,107 @@ if (file_exists($tabFile)) {
 
 <?php
 $extraScripts = '<script>
-// Workflow upload modal - pass stage_id
-document.getElementById("wfUploadModal")?.addEventListener("show.bs.modal", function(e) {
-    var btn = e.relatedTarget;
-    document.getElementById("wfUploadStageId").value = btn.dataset.stageId;
-});
-
 document.getElementById("editBudgetModal")?.addEventListener("show.bs.modal", function(e) {
     const btn = e.relatedTarget;
-    document.getElementById("editBudgetId").value = btn.dataset.id;
-    document.getElementById("editBudgetName").value = btn.dataset.name;
-    document.getElementById("editBudgetCategory").value = btn.dataset.category;
-    document.getElementById("editBudgetQty").value = btn.dataset.quantity;
-    document.getElementById("editBudgetUnit").value = btn.dataset.unit;
-    document.getElementById("editBudgetCost").value = btn.dataset.cost;
+    if (!btn || !btn.dataset) return;
+    document.getElementById("editBudgetId").value = btn.dataset.id || "";
+    document.getElementById("editBudgetName").value = btn.dataset.name || "";
+    document.getElementById("editBudgetQty").value = btn.dataset.quantity || "";
+    document.getElementById("editBudgetUnit").value = btn.dataset.unit || "";
+    document.getElementById("editBudgetCost").value = btn.dataset.cost || "";
+    var durEl = document.getElementById("editBudgetDuration");
+    if (durEl) durEl.value = (btn.dataset.durationDays !== undefined && btn.dataset.durationDays !== "") ? btn.dataset.durationDays : "";
+});
+
+// Enable drag-and-drop reordering of project tabs (per-browser, using localStorage)
+document.addEventListener("DOMContentLoaded", function () {
+    var nav = document.getElementById("projectTabsNav");
+    if (!nav) return;
+
+    var projectId = nav.dataset.projectId || "global";
+    var storageKey = "projectTabsOrder:" + projectId;
+
+    function getItems() {
+        return Array.prototype.slice.call(nav.querySelectorAll(".project-tab-item"));
+    }
+
+    // Apply saved order from localStorage, if any
+    try {
+        var saved = window.localStorage ? window.localStorage.getItem(storageKey) : null;
+        if (saved) {
+            var order = JSON.parse(saved);
+            if (Array.isArray(order) && order.length) {
+                var currentItems = {};
+                getItems().forEach(function (li) {
+                    currentItems[li.dataset.tabKey] = li;
+                });
+                order.forEach(function (key) {
+                    if (currentItems[key]) {
+                        nav.appendChild(currentItems[key]);
+                    }
+                });
+            }
+        }
+    } catch (e) {
+        // ignore storage errors
+    }
+
+    var dragSrcEl = null;
+
+    function handleDragStart(e) {
+        dragSrcEl = this;
+        this.classList.add("dragging");
+        e.dataTransfer.effectAllowed = "move";
+        try {
+            e.dataTransfer.setData("text/plain", this.dataset.tabKey || "");
+        } catch (err) {}
+    }
+
+    function handleDragOver(e) {
+        if (!dragSrcEl) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+        var target = this;
+        if (target === dragSrcEl || !target.classList.contains("project-tab-item")) return;
+        var rect = target.getBoundingClientRect();
+        var offset = (e.clientX - rect.left) / rect.width;
+        if (offset > 0.5) {
+            if (target.nextSibling !== dragSrcEl) {
+                nav.insertBefore(dragSrcEl, target.nextSibling);
+            }
+        } else {
+            if (target !== dragSrcEl.nextSibling) {
+                nav.insertBefore(dragSrcEl, target);
+            }
+        }
+    }
+
+    function handleDrop(e) {
+        if (!dragSrcEl) return;
+        e.preventDefault();
+    }
+
+    function handleDragEnd() {
+        if (dragSrcEl) {
+            dragSrcEl.classList.remove("dragging");
+            dragSrcEl = null;
+        }
+        // Save new order
+        try {
+            if (!window.localStorage) return;
+            var order = getItems().map(function (li) { return li.dataset.tabKey; });
+            window.localStorage.setItem(storageKey, JSON.stringify(order));
+        } catch (e) {
+            // ignore storage errors
+        }
+    }
+
+    getItems().forEach(function (li) {
+        li.addEventListener("dragstart", handleDragStart);
+        li.addEventListener("dragover", handleDragOver);
+        li.addEventListener("drop", handleDrop);
+        li.addEventListener("dragend", handleDragEnd);
+    });
 });
 </script>';
 

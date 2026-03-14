@@ -2,15 +2,23 @@
 $currentPath = getCurrentPath();
 $isProjectsSection = strpos($currentPath, '/pages/projects/') !== false;
 $isSettingsSection = strpos($currentPath, '/pages/settings/') !== false;
+$isDashboardPrivate = strpos($currentPath, '/pages/dashboard/private') !== false;
+$isDashboardPublic = strpos($currentPath, '/pages/dashboard/public') !== false;
 ?>
 <!-- Sidebar -->
 <nav id="sidebar" class="bg-light border-end shadow-sm">
     <div class="sidebar-content pt-3">
         <ul class="nav flex-column">
-            <!-- Dashboard -->
+            <!-- Private Dashboard -->
             <li class="nav-item">
-                <a class="nav-link <?= ($currentPath === '/mantoy/' || $currentPath === '/mantoy/index.php') ? 'active' : '' ?>" href="<?= BASE_URL ?>/">
-                    <i class="bi bi-speedometer2 me-2"></i> Dashboard
+                <a class="nav-link <?= $isDashboardPrivate ? 'active' : '' ?>" href="<?= BASE_URL ?>/pages/dashboard/private.php">
+                    <i class="bi bi-speedometer2 me-2"></i> Private Dashboard
+                </a>
+            </li>
+            <!-- Public Dashboard -->
+            <li class="nav-item">
+                <a class="nav-link <?= $isDashboardPublic ? 'active' : '' ?>" href="<?= BASE_URL ?>/pages/dashboard/public.php">
+                    <i class="bi bi-globe me-2"></i> Public Dashboard
                 </a>
             </li>
 
@@ -75,6 +83,11 @@ $isSettingsSection = strpos($currentPath, '/pages/settings/') !== false;
                         <li class="nav-item">
                             <a class="nav-link <?= strpos($currentPath, 'categories.php') !== false ? 'active' : '' ?>" href="<?= BASE_URL ?>/pages/settings/categories.php">
                                 <i class="bi bi-tags me-2"></i> Categories
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link <?= strpos($currentPath, 'holidays.php') !== false ? 'active' : '' ?>" href="<?= BASE_URL ?>/pages/settings/holidays.php">
+                                <i class="bi bi-calendar-x me-2"></i> Holidays (No-Work)
                             </a>
                         </li>
                     </ul>

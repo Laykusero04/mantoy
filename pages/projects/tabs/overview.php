@@ -56,7 +56,12 @@
 
     <div class="col-lg-4">
         <div class="card shadow-sm">
-            <div class="card-header bg-white"><h6 class="mb-0 section-title">Budget Overview</h6></div>
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h6 class="mb-0 section-title">Budget Overview</h6>
+                <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#editBudgetOverviewModal">
+                    <i class="bi bi-pencil me-1"></i> Edit Budget
+                </button>
+            </div>
             <div class="card-body">
                 <div class="mb-3">
                     <div class="small text-muted">Budget Allocated</div>
@@ -75,6 +80,42 @@
                         <div class="progress-bar bg-<?= $utilization > 90 ? 'danger' : ($utilization > 70 ? 'warning' : 'success') ?>"
                              style="width: <?= min($utilization, 100) ?>%"></div>
                     </div>
+                </div>
+            </div>
+        </div>
+        <!-- Edit Budget Modal (Overview) -->
+        <div class="modal fade" id="editBudgetOverviewModal" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered modal-sm">
+                <div class="modal-content">
+                    <form action="<?= BASE_URL ?>/actions/project_actions.php" method="POST">
+                        <input type="hidden" name="action" value="update_budget">
+                        <input type="hidden" name="project_id" value="<?= $id ?>">
+                        <input type="hidden" name="redirect_url" value="<?= BASE_URL ?>/pages/projects/view.php?id=<?= $id ?>&tab=overview">
+                        <div class="modal-header">
+                            <h6 class="modal-title">Edit Budget</h6>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="mb-3">
+                                <label class="form-label">Budget Allocated</label>
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text">&#8369;</span>
+                                    <input type="number" class="form-control" name="budget_allocated" step="0.01" min="0" value="<?= (float)($project['budget_allocated'] ?? 0) ?>">
+                                </div>
+                            </div>
+                            <div class="mb-0">
+                                <label class="form-label">Actual Cost</label>
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text">&#8369;</span>
+                                    <input type="number" class="form-control" name="actual_cost" step="0.01" min="0" value="<?= (float)($project['actual_cost'] ?? 0) ?>">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-primary btn-sm">Save</button>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>

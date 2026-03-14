@@ -140,7 +140,7 @@ $daysSinceBackup = $lastBackup ? floor((time() - $lastBackup) / 86400) : null;
                         <td><?= date('M d, Y h:i A', $bf['date']) ?></td>
                         <td>
                             <div class="btn-group btn-group-sm">
-                                <a href="<?= BASE_URL ?>/backups/<?= sanitize($bf['name']) ?>" class="btn btn-outline-primary" title="Download" download>
+                                <a href="<?= BASE_URL ?>/download_backup.php?file=<?= urlencode($bf['name']) ?>" class="btn btn-outline-primary" title="Download" download>
                                     <i class="bi bi-download"></i>
                                 </a>
                                 <form action="<?= BASE_URL ?>/actions/backup_actions.php" method="POST" class="d-inline"
